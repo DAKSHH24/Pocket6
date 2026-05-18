@@ -1,0 +1,202 @@
+.analytics-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.grid {
+    display: grid;
+}
+
+.gap-4 {
+    gap: 1rem;
+}
+
+.gap-6 {
+    gap: 1.5rem;
+}
+
+.hover-card {
+    transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.h-96 {
+    height: 24rem;
+}
+
+@media (min-width: 768px) {
+    .md\:grid-cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .md\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .md\:col-span-2 {
+        grid-column: span 2 / span 2;
+    }
+}
+
+/* Specific glows */
+.text-glow-green {
+    color: var(--neon-green);
+    text-shadow: 0 0 10px var(--neon-green-glow);
+}
+
+.text-glow-blue {
+    color: var(--electric-blue);
+    text-shadow: 0 0 10px var(--electric-blue-glow);
+}
+
+.text-glow-purple {
+    color: var(--accent-purple);
+    text-shadow: 0 0 10px rgba(178, 0, 255, 0.4);
+}
+
+.text-glow-red {
+    color: var(--accent-red);
+    text-shadow: 0 0 10px rgba(255, 42, 84, 0.4);
+}
+
+.bg-green-10 {
+    background: rgba(57, 255, 20, 0.1);
+}
+
+.bg-blue-10 {
+    background: rgba(0, 229, 255, 0.1);
+}
+
+.bg-purple-10 {
+    background: rgba(178, 0, 255, 0.1);
+}
+
+.bg-red-10 {
+    background: rgba(255, 42, 84, 0.1);
+}
+
+.text-green {
+    color: var(--neon-green);
+}
+
+.text-blue {
+    color: var(--electric-blue);
+}
+
+.text-purple {
+    color: var(--accent-purple);
+}
+
+.text-red {
+    color: var(--accent-red);
+}
+
+.rounded-full {
+    border-radius: 9999px;
+}
+
+.w-12 {
+    width: 3rem;
+}
+
+.h-12 {
+    height: 3rem;
+}
+
+.mt-1 {
+    margin-top: 0.25rem;
+}
+
+.mt-2 {
+    margin-top: 0.5rem;
+}
+
+.p-2 {
+    padding: 0.5rem;
+}
+
+.p-5 {
+    padding: 1.25rem;
+}
+
+.pr-6 {
+    padding-right: 1.5rem;
+}
+
+.pl-6 {
+    padding-left: 1.5rem;
+}
+
+/* Pin Code Classes */
+.mx-auto {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.my-auto {
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.justify-center {
+    justify-content: center;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.tracking-widest {
+    letter-spacing: 0.1em;
+}
+
+.py-4 {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.py-3 {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+.px-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+.w-full {
+    width: 100%;
+}
+
+.max-w-md {
+    max-width: 28rem;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-3xl {
+    font-size: 1.875rem;
+}
+
+.w-16 {
+    width: 4rem;
+}
+
+.h-16 {
+    height: 4rem;
+}
+
+.h-full {
+    height: 100%;
+}
+
+.mt-20 {
+    margin-top: 5rem;
+}

@@ -1,0 +1,126 @@
+.inventory-container {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Inventory card list ── */
+.inv-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+/* Each inventory item as a proper card row */
+.inv-card {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 0.9rem 1.1rem;
+    border-radius: 10px;
+}
+
+/* Column headers — same grid */
+.inv-header-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    gap: 1.25rem;
+    padding: 0 1.1rem 0.75rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.inv-col-action {
+    width: 42px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Item name with low-stock badge inline */
+.inv-item-name {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+/* Low stock badge — sits right next to item name */
+.low-stock-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Plain text inputs — no spinners */
+.inv-plain-input {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    padding: 0.5rem 0.75rem;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.inv-plain-input::-webkit-inner-spin-button,
+.inv-plain-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.inv-plain-input:focus {
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+.inv-plain-input.inv-stock-low {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #ef4444;
+}
+
+/* Price input with ₹ prefix */
+.inv-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.inv-currency {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+/* Misc helpers */
+.small {
+    padding: 0.4rem;
+}
+
+.mr-2 {
+    margin-right: 0.5rem;
+}
+
+.p-10 {
+    padding: 2.5rem;
+}
+
+.opacity-50 {
+    opacity: 0.5;
+}

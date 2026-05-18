@@ -1,0 +1,189 @@
+.expenses-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.content-grid {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.stats-card {
+    padding: 1.5rem;
+}
+
+.icon-wrapper {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.text-3xl {
+    font-size: 1.875rem;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.font-heading {
+    font-family: var(--font-heading);
+}
+
+.text-glow-red {
+    color: var(--accent-red);
+    text-shadow: 0 0 10px rgba(255, 42, 84, 0.4);
+}
+
+.text-red-400 {
+    color: #ff5274;
+}
+
+.expense-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bg-blue-10 {
+    background: rgba(0, 229, 255, 0.1);
+}
+
+.text-blue {
+    color: var(--electric-blue);
+}
+
+.bg-purple-10 {
+    background: rgba(178, 0, 255, 0.1);
+}
+
+.text-purple {
+    color: var(--accent-purple);
+}
+
+.bg-red-10 {
+    background: rgba(255, 42, 84, 0.1);
+}
+
+.text-red {
+    color: var(--accent-red);
+}
+
+.bg-green-10 {
+    background: rgba(57, 255, 20, 0.1);
+}
+
+.text-green {
+    color: var(--neon-green);
+}
+
+.bg-muted-10 {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+.bg-white-5 {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.hover\:bg-white-10:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.transition {
+    transition: all 0.2s ease;
+}
+
+.rounded {
+    border-radius: 0.5rem;
+}
+
+.shadow-red {
+    box-shadow: 0 0 15px rgba(255, 42, 84, 0.5);
+}
+
+.border-none {
+    border: none;
+}
+
+.min-h-24 {
+    min-height: 6rem;
+    resize: vertical;
+}
+
+.expense-form-wrapper {
+    max-width: 400px;
+}
+
+@media (min-width: 768px) {
+    .md\:flex-row {
+        flex-direction: row;
+    }
+
+    .md\:w-96 {
+        width: 24rem;
+    }
+}
+
+/* Utilities not defined in global */
+.p-6 {
+    padding: 1.5rem;
+}
+
+.p-3 {
+    padding: 0.75rem;
+}
+
+.pb-4 {
+    padding-bottom: 1rem;
+}
+
+.mb-2 {
+    margin-bottom: 0.5rem;
+}
+
+.mb-4 {
+    margin-bottom: 1rem;
+}
+
+.mt-1 {
+    margin-top: 0.25rem;
+}
+
+.mt-2 {
+    margin-top: 0.5rem;
+}
+
+.flex-1 {
+    flex: 1;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.border-b {
+    border-bottom: 1px solid;
+}
+
+.border-glass {
+    border-color: var(--border-glass);
+}
+
+.text-lg {
+    font-size: 1.125rem;
+}

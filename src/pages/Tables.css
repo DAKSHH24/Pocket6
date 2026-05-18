@@ -1,0 +1,843 @@
+.text-glow-orange {
+    color: #ea580c;
+    text-shadow: 0 0 10px rgba(234, 88, 12, 0.4);
+}
+
+.border-t {
+    border-top-width: 1px;
+}
+
+.border-white-10 {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.pt-2 {
+    padding-top: 0.5rem;
+}
+
+.shadow-green {
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+}
+
+.border-green-500 {
+    border-color: #10b981;
+}
+
+.tables-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.page-header h2 {
+    font-size: 1.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.filters-bar {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    width: fit-content;
+}
+
+.filter-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 0.5rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.filter-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.filter-btn.active {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--accent-success);
+}
+
+.tables-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+/* V2 Table Card Matching Image */
+.table-card-v2 {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    padding: 1.25rem;
+}
+
+/* Free state outline */
+.table-card-v2.free {
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Occupied outline matching the green theme subtly */
+.table-card-v2.occupied {
+    border-left: 4px solid var(--accent-success);
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.02) 0%, var(--bg-card) 100%);
+}
+
+.tc-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.tc-title-area h3 {
+    font-size: 1.4rem;
+    max-width: 150px;
+    line-height: 1.2;
+}
+
+.tc-icon-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.tc-icon-btn:hover {
+    transform: translateY(-2px);
+}
+
+.tc-icon-btn span {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+.tc-icon-btn.transfer {
+    color: var(--accent-primary);
+    background: rgba(59, 130, 246, 0.1);
+    padding: 0.5rem;
+    border-radius: 50%;
+}
+
+.tc-icon-btn.reminder {
+    color: var(--accent-warning);
+    background: rgba(245, 158, 11, 0.1);
+    padding: 0.5rem;
+    border-radius: 50%;
+}
+
+.tc-icon-btn.canteen {
+    color: #ea580c;
+    /* Orange */
+    background: rgba(234, 88, 12, 0.1);
+    padding: 0.6rem;
+    border-radius: 50%;
+}
+
+.tc-right-icons {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.tc-type-pill {
+    border: 1px solid var(--accent-success);
+    color: var(--accent-success);
+    background: transparent;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.tc-main-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+/* Timer stacked column — timer on top, label below */
+.tc-timer-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+}
+
+.tc-big-timer {
+    font-size: 2rem;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    color: var(--accent-success);
+}
+
+.table-card-v2.free .tc-big-timer {
+    color: var(--text-primary);
+}
+
+/* Timer turns red/amber when session has expired (60 min up) */
+.tc-timer-expired {
+    color: #ef4444 !important;
+    text-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+    animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+}
+
+.tc-running-dot {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--accent-success);
+}
+
+.tc-running-dot .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--accent-success);
+    animation: pulse 1.5s infinite;
+}
+
+.tc-started-text {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--accent-primary);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.tc-amount {
+    font-size: 2.2rem;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--accent-success);
+    margin-bottom: 0.25rem;
+}
+
+.table-card-v2.free .tc-amount {
+    color: var(--text-primary);
+}
+
+.tc-paused-text,
+.tc-rate-text {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--accent-warning);
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+}
+
+.tc-rate-text {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+/* New Canteen Orders Section */
+.canteen-orders-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    max-height: 120px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.canteen-orders-block::-webkit-scrollbar {
+    width: 4px;
+}
+
+.canteen-orders-block::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.canteen-orders-block::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.canteen-order-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.canteen-order-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.co-name {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.co-qty {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+}
+
+.co-total {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #ea580c;
+    text-shadow: 0 0 10px rgba(234, 88, 12, 0.4);
+}
+
+/* Canteen Modal Items — NO hover animation, professional feel */
+.canteen-modal-item {
+    cursor: default;
+    min-height: 64px;
+    /* Uniform card height across all tabs */
+}
+
+.cmi-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.cmi-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
+}
+
+.qty-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    outline: none;
+    /* No scale animation — professional feel */
+}
+
+.qty-btn:hover:not(:disabled) {
+    opacity: 0.7;
+}
+
+.qty-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.qty-display {
+    color: #000;
+    font-weight: 700;
+    font-size: 1.1rem;
+    min-width: 20px;
+    text-align: center;
+}
+
+.tc-bottom-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.tc-action-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.2s, filter 0.2s;
+}
+
+.tc-action-circle:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+}
+
+.tc-action-circle.bg-yellow {
+    background: rgba(245, 158, 11, 0.8);
+    color: white;
+}
+
+.tc-action-circle.bg-red {
+    background: rgba(239, 68, 68, 0.8);
+    color: white;
+}
+
+.tc-action-circle.bg-green {
+    background: rgba(16, 185, 129, 0.8);
+    color: white;
+}
+
+/* Animations */
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.mt-6 {
+    margin-top: 1.5rem;
+}
+
+.mb-6 {
+    margin-bottom: 1.5rem;
+}
+
+.text-xl {
+    font-size: 1.25rem;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+/* ─── Form Spacing (Create Table) ─── */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.glass-input {
+    -webkit-appearance: none;
+    appearance: none;
+    /* Leaving other properties to existing global styles */
+    padding-right: 2.5rem;
+    /* Room for dropdown arrow */
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+}
+
+/* Cleaner native select arrow spacing */
+select.glass-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+    background-size: 12px;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* ────────── Modal Helpers ────────── */
+
+/* Makes the modal the positioning anchor for the close button */
+.modal-relative {
+    position: relative;
+}
+
+/* X close button — absolute top-right of modal card */
+.modal-close-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-primary);
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+    z-index: 2;
+}
+
+.modal-close-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* Title block with padding-right so it never overlaps the X button */
+.modal-header-block {
+    padding-right: 3rem;
+    margin-bottom: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* Canteen scrollable item list */
+.canteen-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    height: 320px;
+    /* Fixed height — modal stays same size across tabs */
+    overflow-y: auto;
+    padding-right: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.canteen-items-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.canteen-items-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.canteen-items-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+}
+
+/* Updated canteen modal item — compact with controls on right */
+.canteen-modal-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    transition: transform 0.15s;
+}
+
+.canteen-modal-item:hover {
+    transform: translateX(2px);
+}
+
+/* Action row — Cancel left, Done right, equal height */
+.modal-action-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 1rem;
+}
+
+.modal-action-btn {
+    flex: 1;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 0 1.25rem;
+}
+
+/* Remove old hover animation from duplicate rule */
+.canteen-modal-item:hover {
+    transform: none;
+}
+
+/* ─── Checkout Receipt Layout ─── */
+.checkout-header {
+    padding-right: 3rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.checkout-receipt {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 0.5rem;
+}
+
+.receipt-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.receipt-row:last-child {
+    border-bottom: none;
+}
+
+.receipt-label {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.receipt-value {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.receipt-sub .receipt-label {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    padding-left: 0.75rem;
+}
+
+.receipt-sub .receipt-value {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+}
+
+.receipt-subtotal .receipt-label,
+.receipt-subtotal .receipt-value {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.receipt-section-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0.75rem 0 0.25rem;
+}
+
+.receipt-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.12);
+    margin: 0.5rem 0;
+}
+
+.receipt-total {
+    padding: 0.9rem 0 0.4rem;
+}
+
+.receipt-total .receipt-label {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.receipt-total-value {
+    font-size: 2rem;
+    font-weight: 800;
+    font-family: var(--font-heading);
+}
+
+/* ─── Canteen Segmented Control ─── */
+.canteen-seg-control {
+    display: flex;
+    gap: 0;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 3px;
+    margin-bottom: 0.9rem;
+    width: fit-content;
+}
+
+.seg-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 0.45rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+}
+
+.seg-btn.seg-active {
+    background: rgba(16, 185, 129, 0.18);
+    color: var(--accent-success);
+    font-weight: 600;
+}
+
+/* ─── Low Stock Alert Banner (Tables page) ─── */
+.low-stock-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.28);
+    border-radius: 12px;
+    padding: 0.9rem 1.1rem;
+}
+
+.low-stock-alert-icon {
+    font-size: 1.2rem;
+    line-height: 1;
+    margin-top: 0.1rem;
+    flex-shrink: 0;
+}
+
+.low-stock-alert-title {
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: #ef4444;
+    margin-bottom: 0.4rem;
+}
+
+.low-stock-alert-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.low-stock-pill {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #fca5a5;
+    border-radius: 6px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* ─── Header Actions Group ─── */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* ─── Notification Bell Button ─── */
+.notif-wrapper {
+    position: relative;
+}
+
+.notif-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.notif-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.notif-btn.has-alerts {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #ef4444;
+}
+
+.notif-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #ef4444;
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+
+/* ─── Notification Dropdown ─── */
+.notif-dropdown {
+    position: absolute;
+    top: calc(100% + 0.6rem);
+    right: 0;
+    width: 260px;
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+    z-index: 100;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.notif-dropdown-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #ef4444;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid rgba(239, 68, 68, 0.15);
+}
+
+.notif-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-item-name {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.notif-item-stock {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 5px;
+    padding: 0.1rem 0.45rem;
+}
+
+.notif-empty {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 0.5rem 0;
+}
