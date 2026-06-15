@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Square, Plus, Minus, Clock, X, Utensils, Bell, AlertTriangle } from 'lucide-react';
-import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, writeBatch } from 'firebase/firestore';
+import { createPortal } from 'react-dom';
+import { Play, Square, Plus, Minus, Clock, X, Utensils, Bell, AlertTriangle, Trash2 } from 'lucide-react';
+import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import './Tables.css';
 
@@ -19,17 +20,50 @@ export default function Tables() {
     const [showCheckoutFor, setShowCheckoutFor] = useState(null);
     const [showAlerts, setShowAlerts] = useState(false);
     const alertBtnRef = useRef(null);
+    const alertDropRef = useRef(null);
+    const [addTableError, setAddTableError] = useState('');
 
     // New Table Form
     const [newTableType, setNewTableType] = useState('Snooker');
     const [customType, setCustomType] = useState('');
     const [newTableName, setNewTableName] = useState('');
     const [newTableRate, setNewTableRate] = useState('');
+    // PlayStation controller rates (1–4 controllers), stored as hourly
+    const [psRates, setPsRates] = useState({ 1: '', 2: '', 3: '', 4: '' });
+
+    // Search
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         const timerId = setInterval(() => setCurrentTime(Date.now()), 1000);
         return () => clearInterval(timerId);
     }, []);
+
+    // Close inventory alert dropdown when clicking anywhere outside
+    useEffect(() => {
+        if (!showAlerts) return;
+        function handleOutsideClick(e) {
+            if (
+                alertBtnRef.current && !alertBtnRef.current.contains(e.target) &&
+                alertDropRef.current && !alertDropRef.current.contains(e.target)
+            ) {
+                setShowAlerts(false);
+            }
+        }
+        document.addEventListener('mousedown', handleOutsideClick);
+        return () => document.removeEventListener('mousedown', handleOutsideClick);
+    }, [showAlerts]);
+
+    // Lock body scroll when any modal is open so background doesn't shift
+    useEffect(() => {
+        const anyOpen = showAddModal || showCanteenFor || showCheckoutFor;
+        if (anyOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [showAddModal, showCanteenFor, showCheckoutFor]);
 
     // Fetch Tables from Firestore
     useEffect(() => {
@@ -65,6 +99,15 @@ export default function Tables() {
             });
         } catch (error) {
             console.error("Error starting table:", error);
+        }
+    };
+
+    const handleDeleteTable = async (tableId, tableName) => {
+        if (!window.confirm(`Are you sure you want to delete "${tableName}"? This action cannot be undone.`)) return;
+        try {
+            await deleteDoc(doc(db, 'tables', tableId));
+        } catch (error) {
+            console.error('Error deleting table:', error);
         }
     };
 
@@ -113,30 +156,74 @@ export default function Tables() {
 
     const handleAddTable = async (e) => {
         e.preventDefault();
+        setAddTableError('');
         const type = newTableType === 'Other' ? customType : newTableType;
-        if (!type || !newTableName || !newTableRate) return;
 
-        const newId = Date.now().toString();
-        const newTable = {
-            type: type,
-            name: newTableName,
-            status: 'free',
-            startTime: null,
-            rate: parseFloat(newTableRate),
-            customer: '',
-            note: '',
-            pausedTime: 0,
-            orders: []
-        };
+        if (newTableType === 'Play Station') {
+            // At least one controller rate must be filled
+            const hasAnyRate = Object.values(psRates).some(v => v !== '');
+            if (!type || !newTableName || !hasAnyRate) {
+                setAddTableError('Please fill in the table name and at least one controller rate.');
+                return;
+            }
 
-        try {
-            await setDoc(doc(db, 'tables', newId), newTable);
-            setNewTableName('');
-            setNewTableRate('');
-            setCustomType('');
-            setShowAddModal(false);
-        } catch (error) {
-            console.error("Error adding table:", error);
+            const newId = Date.now().toString();
+            // Convert hourly rates to per-minute
+            const controllerRates = {};
+            Object.entries(psRates).forEach(([controllers, hourlyRate]) => {
+                if (hourlyRate !== '') {
+                    controllerRates[controllers] = parseFloat((parseFloat(hourlyRate) / 60).toFixed(4));
+                }
+            });
+            const newTable = {
+                type,
+                name: newTableName,
+                status: 'free',
+                startTime: null,
+                rate: controllerRates['1'] || 0, // default rate = 1 controller rate
+                controllerRates,
+                activeControllers: 1,
+                customer: '',
+                note: '',
+                pausedTime: 0,
+                orders: []
+            };
+            try {
+                await setDoc(doc(db, 'tables', newId), newTable);
+                setNewTableName('');
+                setPsRates({ 1: '', 2: '', 3: '', 4: '' });
+                setShowAddModal(false);
+            } catch (error) {
+                console.error("Error adding table:", error);
+            }
+        } else {
+            if (!type || !newTableName || !newTableRate) {
+                setAddTableError('Please fill in all fields before creating the table.');
+                return;
+            }
+            // Convert hourly rate to per-minute
+            const ratePerMinute = parseFloat((parseFloat(newTableRate) / 60).toFixed(4));
+            const newId = Date.now().toString();
+            const newTable = {
+                type,
+                name: newTableName,
+                status: 'free',
+                startTime: null,
+                rate: ratePerMinute,
+                customer: '',
+                note: '',
+                pausedTime: 0,
+                orders: []
+            };
+            try {
+                await setDoc(doc(db, 'tables', newId), newTable);
+                setNewTableName('');
+                setNewTableRate('');
+                setCustomType('');
+                setShowAddModal(false);
+            } catch (error) {
+                console.error("Error adding table:", error);
+            }
         }
     };
 
@@ -204,7 +291,10 @@ export default function Tables() {
         return new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).format(new Date(ms));
     };
 
-    const filteredTables = activeFilter === 'All' ? tables : tables.filter(t => t.type === activeFilter);
+    const baseFiltered = activeFilter === 'All' ? tables : tables.filter(t => t.type === activeFilter);
+    const filteredTables = searchQuery.trim()
+        ? baseFiltered.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        : baseFiltered;
     const categories = ['All', ...new Set(tables.map(t => t.type))];
 
     return (
@@ -231,7 +321,7 @@ export default function Tables() {
                                     )}
                                 </button>
                                 {showAlerts && (
-                                    <div className="notif-dropdown glass-panel">
+                                    <div className="notif-dropdown glass-panel" ref={alertDropRef}>
                                         <div className="notif-dropdown-title">
                                             <AlertTriangle size={14} /> Inventory Alerts
                                         </div>
@@ -266,6 +356,20 @@ export default function Tables() {
                 ))}
             </div>
 
+            <div className="search-bar-wrapper">
+                <span className="search-icon-inner">🔍</span>
+                <input
+                    type="text"
+                    className="glass-input search-input"
+                    placeholder="Search tables by name…"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                    <button className="search-clear-btn" onClick={() => setSearchQuery('')} title="Clear search">✕</button>
+                )}
+            </div>
+
             <div className="tables-grid">
                 {filteredTables.map(table => {
                     const isOccupied = table.status === 'occupied';
@@ -282,6 +386,11 @@ export default function Tables() {
                                     <h3>{table.name}</h3>
                                 </div>
                                 <div className="tc-right-icons">
+                                    {!isOccupied && (
+                                        <button className="tc-delete-btn-top" onClick={(e) => { e.stopPropagation(); handleDeleteTable(table.id, table.name); }} title="Delete Table">
+                                            <Trash2 size={15} />
+                                        </button>
+                                    )}
                                     <span className="tc-type-pill">{table.type}</span>
                                 </div>
                             </div>
@@ -291,7 +400,6 @@ export default function Tables() {
                                     {isOccupied ? (
                                         <>
                                             <div className={`tc-big-timer${elapsedMs >= 3600000 ? ' tc-timer-expired' : ''}`}>{formatCountdown(elapsedMs)}</div>
-                                            <div className="tc-running-dot"><span className="dot"></span> 60m Countdown</div>
                                         </>
                                     ) : (
                                         <>
@@ -328,18 +436,20 @@ export default function Tables() {
                                 Rate: ₹{table.rate.toFixed(2)}/min
                             </div>
 
-                            {/* Order display list */}
+                            {/* Order display list — sorted alphabetically */}
                             {table.orders && table.orders.length > 0 && (
                                 <div className="canteen-orders-block">
-                                    {table.orders.map((o, idx) => (
-                                        <div key={idx} className="canteen-order-line">
-                                            <div className="canteen-order-info">
-                                                <span className="co-name">{o.name}</span>
-                                                <span className="co-qty">Qty: {o.qty}</span>
+                                    {[...table.orders]
+                                        .sort((a, b) => a.name.localeCompare(b.name))
+                                        .map((o, idx) => (
+                                            <div key={idx} className="canteen-order-line">
+                                                <div className="canteen-order-info">
+                                                    <span className="co-name">{o.name}</span>
+                                                    <span className="co-qty">Qty: {o.qty}</span>
+                                                </div>
+                                                <div className="co-total">₹{(o.qty * o.price).toFixed(2)}</div>
                                             </div>
-                                            <div className="co-total">₹{(o.qty * o.price).toFixed(2)}</div>
-                                        </div>
-                                    ))}
+                                        ))}
                                 </div>
                             )}
 
@@ -349,8 +459,8 @@ export default function Tables() {
                                         <Square size={20} fill="#fff" className="mr-2" /> End Session
                                     </button>
                                 ) : (
-                                    <button className="tc-action-circle bg-green tooltip-container" onClick={() => handleStart(table.id)} title="Play">
-                                        <Play size={20} fill="#fff" />
+                                    <button className="tc-action-circle bg-green tooltip-container" onClick={() => handleStart(table.id)} title="Start Session" style={{ width: '100%', borderRadius: '8px' }}>
+                                        <Play size={20} fill="#fff" className="mr-2" /> Start Session
                                     </button>
                                 )}
                             </div>
@@ -359,16 +469,18 @@ export default function Tables() {
                 })}
             </div>
 
-            {/* CANTEEN MODAL */}
-            {showCanteenFor && (() => {
+            {/* CANTEEN MODAL — portal so it's always viewport-centered */}
+            {showCanteenFor && createPortal((() => {
                 const drinksFilter = (item) => item.category === 'Drinks';
                 const tobaccoFilter = (item) => item.category === 'Tobacco/Lounge';
                 const snacksFilter = (item) => item.category !== 'Drinks' && item.category !== 'Tobacco/Lounge';
-                const filteredInventory = inventory.filter(
-                    canteenTab === 'Drinks' ? drinksFilter :
-                        canteenTab === 'Tobacco' ? tobaccoFilter :
-                            snacksFilter
-                );
+                const filteredInventory = [...inventory]
+                    .filter(
+                        canteenTab === 'Drinks' ? drinksFilter :
+                            canteenTab === 'Tobacco' ? tobaccoFilter :
+                                snacksFilter
+                    )
+                    .sort((a, b) => a.name.localeCompare(b.name));
                 return (
                     <div className="overlay" onClick={() => setShowCanteenFor(null)}>
                         <div className="modal modal-relative" onClick={e => e.stopPropagation()}>
@@ -428,13 +540,12 @@ export default function Tables() {
                         </div>
                     </div>
                 );
-            })()}
+            })(), document.body)}
 
-            {/* CHECKOUT MODAL */}
-            {showCheckoutFor && (() => {
+            {/* CHECKOUT MODAL — portal */}
+            {showCheckoutFor && createPortal((() => {
                 const tableInfo = showCheckoutFor;
                 const elapsedMs = Math.max(0, currentTime - tableInfo.startTime);
-                // Cap at 60 minutes — billing stops after time is up
                 const cappedMs = Math.min(elapsedMs, 60 * 60000);
                 const minsElapsed = cappedMs / 60000;
                 const playedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
@@ -448,13 +559,11 @@ export default function Tables() {
                                 <X size={18} />
                             </button>
 
-                            {/* Header */}
                             <div className="checkout-header">
                                 <h3 className="text-2xl font-bold text-glow-red">Checkout Session</h3>
                                 <p className="text-muted text-sm">{tableInfo.name}</p>
                             </div>
 
-                            {/* Receipt rows */}
                             <div className="checkout-receipt">
                                 <div className="receipt-row">
                                     <span className="receipt-label">Table ({minsElapsed.toFixed(0)} min × ₹{tableInfo.rate}/min)</span>
@@ -464,12 +573,14 @@ export default function Tables() {
                                 {(tableInfo.orders || []).length > 0 && (
                                     <>
                                         <div className="receipt-section-title">Canteen Orders</div>
-                                        {tableInfo.orders.map((o, i) => (
-                                            <div key={i} className="receipt-row receipt-sub">
-                                                <span className="receipt-label">{o.name} × {o.qty}</span>
-                                                <span className="receipt-value">₹{(o.qty * o.price).toFixed(2)}</span>
-                                            </div>
-                                        ))}
+                                        {[...tableInfo.orders]
+                                            .sort((a, b) => a.name.localeCompare(b.name))
+                                            .map((o, i) => (
+                                                <div key={i} className="receipt-row receipt-sub">
+                                                    <span className="receipt-label">{o.name} × {o.qty}</span>
+                                                    <span className="receipt-value">₹{(o.qty * o.price).toFixed(2)}</span>
+                                                </div>
+                                            ))}
                                         <div className="receipt-row receipt-sub receipt-subtotal">
                                             <span className="receipt-label">Canteen Subtotal</span>
                                             <span className="receipt-value">₹{foodCost.toFixed(2)}</span>
@@ -494,10 +605,10 @@ export default function Tables() {
                         </div>
                     </div>
                 );
-            })()}
+            })(), document.body)}
 
-            {/* ADD TABLE MODAL */}
-            {showAddModal && (
+            {/* ADD TABLE MODAL — portal */}
+            {showAddModal && createPortal(
                 <div className="overlay" onClick={() => setShowAddModal(false)}>
                     <div className="modal modal-relative" onClick={e => e.stopPropagation()}>
                         <button className="modal-close-btn" onClick={() => setShowAddModal(false)}>
@@ -507,7 +618,7 @@ export default function Tables() {
                             <h3 className="text-xl font-bold">Create New Table/Room</h3>
                         </div>
 
-                        <form onSubmit={handleAddTable} className="flex-col gap-4">
+                        <form onSubmit={handleAddTable} className="flex-col gap-4" noValidate>
                             <div className="form-group flex-col gap-2">
                                 <label className="text-sm text-muted">What type of table is it?</label>
                                 <select
@@ -544,28 +655,57 @@ export default function Tables() {
                                 />
                             </div>
 
-                            <div className="form-group flex-col gap-2">
-                                <label className="text-sm text-muted">Rate Per Minute (₹)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    className="glass-input text-lg font-bold"
-                                    placeholder="2.50"
-                                    value={newTableRate}
-                                    onChange={e => setNewTableRate(e.target.value)}
-                                    required
-                                />
-                            </div>
+                            {newTableType === 'Play Station' ? (
+                                <div className="form-group flex-col gap-2">
+                                    <label className="text-sm text-muted">Hourly Rate per Controller Count (₹/hr)</label>
+                                    <div className="ps-rates-grid">
+                                        {[1, 2, 3, 4].map(n => (
+                                            <div key={n} className="ps-rate-row">
+                                                <span className="ps-rate-label">🎮 {n} Controller{n > 1 ? 's' : ''}</span>
+                                                <input
+                                                    type="number"
+                                                    step="1"
+                                                    min="0"
+                                                    className="glass-input ps-rate-input"
+                                                    placeholder={`₹ / hr`}
+                                                    value={psRates[n]}
+                                                    onChange={e => setPsRates(prev => ({ ...prev, [n]: e.target.value }))}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="ps-rate-hint">Rates will be automatically converted to per-minute billing.</p>
+                                </div>
+                            ) : (
+                                <div className="form-group flex-col gap-2">
+                                    <label className="text-sm text-muted">Rate Per Hour (₹)</label>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        className="glass-input text-lg font-bold"
+                                        placeholder="150"
+                                        value={newTableRate}
+                                        onChange={e => setNewTableRate(e.target.value)}
+                                        required
+                                    />
+                                    <p className="ps-rate-hint">Will be billed at ₹{newTableRate ? (parseFloat(newTableRate) / 60).toFixed(2) : '0.00'}/min</p>
+                                </div>
+                            )}
 
+                            {addTableError && (
+                                <div style={{ color: '#f87171', fontSize: '0.82rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '0.5rem 0.8rem' }}>
+                                    {addTableError}
+                                </div>
+                            )}
                             <div className="modal-action-row">
-                                <button type="button" className="glass-button modal-action-btn" onClick={() => setShowAddModal(false)}>Cancel</button>
+                                <button type="button" className="glass-button modal-action-btn" onClick={() => { setShowAddModal(false); setAddTableError(''); }}>Cancel</button>
                                 <button type="submit" className="primary-button modal-action-btn">Create Table</button>
                             </div>
                         </form>
                     </div>
                 </div>
-            )}
+                , document.body)}
         </div>
     );
 }

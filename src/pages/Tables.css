@@ -164,6 +164,25 @@
     margin-top: 0.25rem;
 }
 
+.tc-delete-btn-top {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    cursor: pointer;
+    padding: 0.35rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.18s, border-color 0.18s, transform 0.18s;
+}
+
+.tc-delete-btn-top:hover {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.5);
+    transform: scale(1.1);
+}
+
 .tc-main-status {
     display: flex;
     justify-content: space-between;
@@ -375,6 +394,35 @@
     display: flex;
     justify-content: center;
     gap: 1rem;
+}
+
+/* Free-state: play button + trash delete side by side */
+.tc-free-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    justify-content: center;
+    width: 100%;
+}
+
+.tc-delete-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.tc-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.5);
+    transform: translateY(-1px);
 }
 
 .tc-action-circle {
@@ -840,4 +888,79 @@ select.glass-input {
     color: var(--text-muted);
     text-align: center;
     padding: 0.5rem 0;
+}
+
+/* ─── Search Bar ─── */
+.search-bar-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    max-width: 420px;
+}
+
+.search-bar-wrapper .search-icon-inner {
+    position: absolute;
+    left: 0.85rem;
+    font-size: 1rem;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.6;
+}
+
+.search-bar-wrapper .search-input {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+}
+
+.search-clear-btn {
+    position: absolute;
+    right: 0.75rem;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+}
+
+.search-clear-btn:hover {
+    color: var(--text-primary);
+}
+
+/* ─── PlayStation Controller Rate Grid ─── */
+.ps-rates-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.25rem;
+}
+
+.ps-rate-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.ps-rate-label {
+    min-width: 130px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.ps-rate-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.95rem;
+}
+
+.ps-rate-hint {
+    font-size: 0.78rem;
+    color: var(--accent-success);
+    margin-top: 0.25rem;
+    opacity: 0.85;
 }

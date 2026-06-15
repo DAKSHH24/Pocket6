@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, PackageOpen, AlertTriangle } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Plus, Trash2, PackageOpen, AlertTriangle, X } from 'lucide-react';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import './FoodDrinks.css';
@@ -8,7 +9,8 @@ export default function FoodDrinks() {
     const [inventory, setInventory] = useState([]);
     const [activeTab, setActiveTab] = useState('Snacks');
     const [showAddModal, setShowAddModal] = useState(false);
-    const [newItem, setNewItem] = useState({ name: '', category: 'Snacks', price: '', stock: '' });
+    const [saveError, setSaveError] = useState('');
+    const [newItem, setNewItem] = useState({ name: '', category: 'Snacks', price: '', cost: '', stock: '' });
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, 'inventory'), (snapshot) => {
@@ -27,6 +29,7 @@ export default function FoodDrinks() {
 
     const handleAddItem = async (e) => {
         e.preventDefault();
+        setSaveError('');
         if (!newItem.name || !newItem.price) return;
 
         try {
@@ -35,12 +38,14 @@ export default function FoodDrinks() {
                 name: newItem.name,
                 category: newItem.category,
                 price: parseFloat(newItem.price),
+                cost: parseFloat(newItem.cost || 0),
                 stock: parseInt(newItem.stock || 0)
             });
-            setNewItem({ name: '', category: 'Snacks', price: '', stock: '' });
+            setNewItem({ name: '', category: 'Snacks', price: '', cost: '', stock: '' });
             setShowAddModal(false);
         } catch (error) {
             console.error("Error adding item:", error);
+            setSaveError(`Failed to save: ${error.message}`);
         }
     };
 
@@ -70,11 +75,21 @@ export default function FoodDrinks() {
         }
     };
 
-    const filteredItems = inventory.filter(item =>
-        activeTab === 'Snacks' ? item.category === 'Snacks' :
-            activeTab === 'Drinks' ? item.category === 'Drinks' :
-                item.category === 'Tobacco/Lounge'
-    );
+    const updateCost = async (id, val) => {
+        try {
+            await updateDoc(doc(db, 'inventory', id), { cost: parseFloat(val) || 0 });
+        } catch (error) {
+            console.error("Error updating cost:", error);
+        }
+    };
+
+    const filteredItems = inventory
+        .filter(item =>
+            activeTab === 'Snacks' ? item.category === 'Snacks' :
+                activeTab === 'Drinks' ? item.category === 'Drinks' :
+                    item.category === 'Tobacco/Lounge'
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
 
     return (
         <div className="inventory-container">
@@ -99,7 +114,8 @@ export default function FoodDrinks() {
                 {/* Column headers */}
                 <div className="inv-header-row">
                     <div className="inv-col-name">Item Name</div>
-                    <div className="inv-col-price">Unit Price (₹)</div>
+                    <div className="inv-col-price">Cost Price (₹)</div>
+                    <div className="inv-col-price">Selling Price (₹)</div>
                     <div className="inv-col-stock">Available Stock</div>
                     <div className="inv-col-action">Actions</div>
                 </div>
@@ -124,6 +140,19 @@ export default function FoodDrinks() {
                                                     Low Stock
                                                 </span>
                                             )}
+                                        </div>
+                                    </div>
+
+                                    <div className="inv-col-price">
+                                        <div className="inv-input-wrap">
+                                            <span className="inv-currency">₹</span>
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                className="inv-plain-input"
+                                                value={item.cost || 0}
+                                                onChange={e => updateCost(item.id, e.target.value)}
+                                            />
                                         </div>
                                     </div>
 
@@ -162,14 +191,15 @@ export default function FoodDrinks() {
                 )}
             </div>
 
-            {/* ADD MODAL */}
-            {showAddModal && (
+            {/* ADD MODAL — portal so it always renders at body level */}
+            {showAddModal && createPortal(
                 <div className="overlay" onClick={() => setShowAddModal(false)}>
                     <div className="modal modal-relative" onClick={e => e.stopPropagation()}>
+                        <button className="modal-close-btn" onClick={() => setShowAddModal(false)}><X size={18} /></button>
                         <div className="modal-header-block">
                             <h3 className="text-xl font-bold">Add New Menu Item</h3>
                         </div>
-                        <form onSubmit={handleAddItem} className="flex-col gap-4">
+                        <form onSubmit={handleAddItem} className="flex-col gap-4" noValidate>
                             <div className="form-group">
                                 <label className="text-sm text-muted">Item Name</label>
                                 <input
@@ -178,6 +208,8 @@ export default function FoodDrinks() {
                                     required
                                     value={newItem.name}
                                     onChange={e => setNewItem({ ...newItem, name: e.target.value })}
+                                    placeholder="e.g. Red Bull"
+                                    autoFocus
                                 />
                             </div>
                             <div className="form-group">
@@ -194,7 +226,18 @@ export default function FoodDrinks() {
                             </div>
                             <div className="flex gap-4">
                                 <div className="form-group flex-1">
-                                    <label className="text-sm text-muted">Price (₹)</label>
+                                    <label className="text-sm text-muted">Cost Price (₹)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        className="glass-input"
+                                        value={newItem.cost}
+                                        onChange={e => setNewItem({ ...newItem, cost: e.target.value })}
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div className="form-group flex-1">
+                                    <label className="text-sm text-muted">Selling Price (₹)</label>
                                     <input
                                         type="text"
                                         inputMode="decimal"
@@ -202,6 +245,7 @@ export default function FoodDrinks() {
                                         required
                                         value={newItem.price}
                                         onChange={e => setNewItem({ ...newItem, price: e.target.value })}
+                                        placeholder="0.00"
                                     />
                                 </div>
                                 <div className="form-group flex-1">
@@ -210,19 +254,25 @@ export default function FoodDrinks() {
                                         type="text"
                                         inputMode="numeric"
                                         className="glass-input"
-                                        required
                                         value={newItem.stock}
                                         onChange={e => setNewItem({ ...newItem, stock: e.target.value })}
+                                        placeholder="0"
                                     />
                                 </div>
                             </div>
+                            {saveError && (
+                                <div style={{ color: '#f87171', fontSize: '0.82rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '0.5rem 0.8rem' }}>
+                                    ⚠ {saveError}
+                                </div>
+                            )}
                             <div className="modal-action-row">
-                                <button type="button" className="glass-button modal-action-btn" onClick={() => setShowAddModal(false)}>Cancel</button>
+                                <button type="button" className="glass-button modal-action-btn" onClick={() => { setShowAddModal(false); setSaveError(''); }}>Cancel</button>
                                 <button type="submit" className="primary-button modal-action-btn">Save Item</button>
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
