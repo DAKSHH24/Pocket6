@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Trash2, PackageOpen, AlertTriangle, X } from 'lucide-react';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { useAuth } from '../context/AuthContext';
 import './FoodDrinks.css';
 
 export default function FoodDrinks() {
+    const { clubId } = useAuth();
     const [inventory, setInventory] = useState([]);
     const [activeTab, setActiveTab] = useState('Snacks');
     const [showAddModal, setShowAddModal] = useState(false);
@@ -13,19 +15,20 @@ export default function FoodDrinks() {
     const [newItem, setNewItem] = useState({ name: '', category: 'Snacks', price: '', cost: '', stock: '' });
 
     useEffect(() => {
-        const unsubscribe = onSnapshot(collection(db, 'inventory'), (snapshot) => {
+        if (!clubId) return;
+        const q = query(collection(db, 'inventory'), where('clubId', '==', clubId));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetched = [];
             snapshot.forEach(doc => {
                 fetched.push({ id: doc.id, ...doc.data() });
             });
-            // Ensure no legacy 'Food' category sneaks into UI if it previously existed
             const cleaned = fetched.map(item =>
                 item.category === 'Food' ? { ...item, category: 'Snacks' } : item
             );
             setInventory(cleaned);
         });
         return () => unsubscribe();
-    }, []);
+    }, [clubId]);
 
     const handleAddItem = async (e) => {
         e.preventDefault();
@@ -35,6 +38,7 @@ export default function FoodDrinks() {
         try {
             const newItemId = Date.now().toString();
             await setDoc(doc(db, 'inventory', newItemId), {
+                clubId,
                 name: newItem.name,
                 category: newItem.category,
                 price: parseFloat(newItem.price),
@@ -95,8 +99,7 @@ export default function FoodDrinks() {
         <div className="inventory-container">
             <div className="page-header mb-6">
                 <div>
-                    <h2>Menu &amp; Inventory Manager</h2>
-                    <p className="text-muted">Add, remove, and price menu items. Monitor stock levels.</p>
+                    <h2>Food &amp; Drinks Menu</h2>
                 </div>
                 <button className="primary-button" onClick={() => setShowAddModal(true)}>
                     <Plus size={18} className="mr-2" /> Add Menu Item

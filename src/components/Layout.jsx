@@ -24,8 +24,8 @@ export default function Layout() {
     }
 
     const navItems = [
-        { name: 'Tables & Sessions', path: '/tables', icon: Gamepad2 },
-        { name: 'Food & Drinks', path: '/food', icon: Coffee },
+        { name: 'Tables & Sessions',   path: '/tables',    icon: Gamepad2 },
+        { name: 'Food & Drinks',       path: '/food',      icon: Coffee },
         { name: 'Financial Analytics', path: '/analytics', icon: LineChart },
     ];
 

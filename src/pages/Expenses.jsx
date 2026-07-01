@@ -57,7 +57,6 @@ export default function Expenses() {
             <div className="page-header mb-6">
                 <div>
                     <h2>Daily Expenses</h2>
-                    <p className="text-muted">Track all daily outings, maintenance, and operational costs.</p>
                 </div>
                 <button className="primary-button" onClick={() => setShowForm(!showForm)}>
                     <Plus size={18} className="mr-2" /> Add Expense

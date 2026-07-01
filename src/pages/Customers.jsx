@@ -16,7 +16,6 @@ export default function Customers() {
             <div className="page-header">
                 <div>
                     <h2>Customers</h2>
-                    <p className="text-muted">Manage your club members and view their activity.</p>
                 </div>
                 <button className="primary-button">+ Add Customer</button>
             </div>

@@ -57,6 +57,21 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  position: relative;
+}
+
+/* Billiards room background — fixed behind all content */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/billiards-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* Heavy dark overlay so content stays clean and readable */
+  filter: brightness(0.28) saturate(0.7);
 }
 
 /* Glassmorphism Utilities - More muted */

@@ -142,14 +142,20 @@
     gap: 1rem;
 }
 
+.analytics-kpi-grid.cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
 @media (max-width: 900px) {
-    .analytics-kpi-grid {
+    .analytics-kpi-grid,
+    .analytics-kpi-grid.cols-3 {
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
 @media (max-width: 560px) {
-    .analytics-kpi-grid {
+    .analytics-kpi-grid,
+    .analytics-kpi-grid.cols-3 {
         grid-template-columns: 1fr;
     }
 }
@@ -715,15 +721,26 @@
 .period-filter-bar {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.25rem;
-    padding: 1.1rem 1.4rem;
-    align-items: flex-end;
+    gap: 0;
+    padding: 1.25rem 1.5rem;
+    align-items: center;
 }
 
 .period-section {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.5rem;
+    padding: 0.25rem 1.5rem;
+}
+
+.period-section:first-child {
+    padding-left: 0;
+    border-right: 1px solid rgba(255,255,255,0.08);
+    padding-right: 1.5rem;
+}
+
+.period-section:last-child {
+    padding-right: 0;
 }
 
 .period-label {
@@ -769,12 +786,15 @@
 .period-date-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
 .period-date-sep {
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 0 0.25rem;
+    flex-shrink: 0;
 }
 
 .period-date-wrap {
@@ -793,16 +813,17 @@
 
 .period-date-input {
     background: rgba(0,0,0,0.3);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
     color: var(--text-primary);
     font-family: var(--font-body);
-    font-size: 0.85rem;
-    padding: 0.42rem 0.75rem 0.42rem 2rem;
+    font-size: 0.88rem;
+    padding: 0.55rem 0.85rem 0.55rem 2.2rem;
     outline: none;
-    transition: border-color 0.15s;
-    width: 148px;
+    transition: border-color 0.15s, background 0.15s;
+    width: 165px;
     cursor: pointer;
+    letter-spacing: 0.02em;
 }
 
 .period-date-input:focus {

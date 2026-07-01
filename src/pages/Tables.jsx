@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Play, Square, Plus, Minus, Clock, X, Utensils, Bell, AlertTriangle, Trash2 } from 'lucide-react';
-import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, writeBatch, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, writeBatch, deleteDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { useAuth } from '../context/AuthContext';
 import './Tables.css';
 
 export default function Tables() {
+    const { clubId } = useAuth();
     const [tables, setTables] = useState([]);
     const [activeFilter, setActiveFilter] = useState('All');
     const [currentTime, setCurrentTime] = useState(Date.now());
@@ -23,6 +25,9 @@ export default function Tables() {
     const alertDropRef = useRef(null);
     const [addTableError, setAddTableError] = useState('');
 
+    // PS Player Count Modal
+    const [showPsStartModal, setShowPsStartModal] = useState(null); // table object
+
     // New Table Form
     const [newTableType, setNewTableType] = useState('Snooker');
     const [customType, setCustomType] = useState('');
@@ -34,6 +39,44 @@ export default function Tables() {
     // Search
     const [searchQuery, setSearchQuery] = useState('');
 
+    // ── One-time migration ──────────────────────────────────────────────────
+    // Existing Firestore docs were created before multi-tenancy was added and
+    // have no clubId field. This effect runs once per login, finds every doc
+    // across all 4 collections that is missing clubId, and stamps them in a
+    // batch update. Safe to re-run — it only touches untagged documents.
+    useEffect(() => {
+        if (!clubId) return;
+        let cancelled = false;
+        const COLLECTIONS = ['tables', 'inventory', 'session_history', 'expenses'];
+
+        async function migrateUntaggedDocs() {
+            for (const colName of COLLECTIONS) {
+                try {
+                    const snap = await getDocs(collection(db, colName));
+                    const untagged = snap.docs.filter(d => !d.data().clubId);
+                    if (untagged.length === 0 || cancelled) continue;
+
+                    // Batch in groups of 500 (Firestore limit)
+                    for (let i = 0; i < untagged.length; i += 500) {
+                        const batch = writeBatch(db);
+                        untagged.slice(i, i + 500).forEach(d =>
+                            batch.update(doc(db, colName, d.id), { clubId })
+                        );
+                        await batch.commit();
+                    }
+                    console.log(`[Migration] Stamped ${untagged.length} docs in '${colName}'`);
+                } catch (err) {
+                    console.error(`[Migration] Error in '${colName}':`, err);
+                }
+            }
+        }
+
+        migrateUntaggedDocs();
+        return () => { cancelled = true; };
+    }, [clubId]); // runs once per session
+    // ───────────────────────────────────────────────────────────────────────
+
+    // 1-second clock tick (drives live elapsed time display)
     useEffect(() => {
         const timerId = setInterval(() => setCurrentTime(Date.now()), 1000);
         return () => clearInterval(timerId);
@@ -65,9 +108,11 @@ export default function Tables() {
         return () => { document.body.style.overflow = ''; };
     }, [showAddModal, showCanteenFor, showCheckoutFor]);
 
-    // Fetch Tables from Firestore
+    // Fetch only THIS club's tables
     useEffect(() => {
-        const unsubscribe = onSnapshot(collection(db, 'tables'), (snapshot) => {
+        if (!clubId) return;
+        const q = query(collection(db, 'tables'), where('clubId', '==', clubId));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedTables = [];
             snapshot.forEach(doc => {
                 fetchedTables.push({ id: doc.id, ...doc.data() });
@@ -75,11 +120,13 @@ export default function Tables() {
             setTables(fetchedTables);
         });
         return () => unsubscribe();
-    }, []);
+    }, [clubId]);
 
-    // Fetch Inventory from Firestore
+    // Fetch only THIS club's inventory
     useEffect(() => {
-        const unsubscribe = onSnapshot(collection(db, 'inventory'), (snapshot) => {
+        if (!clubId) return;
+        const q = query(collection(db, 'inventory'), where('clubId', '==', clubId));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedInventory = [];
             snapshot.forEach(doc => {
                 fetchedInventory.push({ id: doc.id, ...doc.data() });
@@ -87,7 +134,7 @@ export default function Tables() {
             setInventory(fetchedInventory);
         });
         return () => unsubscribe();
-    }, []);
+    }, [clubId]);
 
     const handleStart = async (id) => {
         try {
@@ -99,6 +146,24 @@ export default function Tables() {
             });
         } catch (error) {
             console.error("Error starting table:", error);
+        }
+    };
+
+    // PS-specific start: pick player count first
+    const handlePsStartConfirm = async (table, playerCount) => {
+        const rate = table.controllerRates?.[playerCount] ?? table.rate;
+        try {
+            await updateDoc(doc(db, 'tables', table.id), {
+                status: 'occupied',
+                startTime: Date.now(),
+                pausedTime: 0,
+                orders: [],
+                activeControllers: parseInt(playerCount),
+                rate
+            });
+            setShowPsStartModal(null);
+        } catch (error) {
+            console.error("Error starting PS table:", error);
         }
     };
 
@@ -115,6 +180,8 @@ export default function Tables() {
         setShowCheckoutFor(table);
     };
 
+    const MIN_PLAY_COST = 50; // Minimum billing for playing time
+
     const finalizeCheckout = async () => {
         if (!showCheckoutFor) return;
         const tableInfo = showCheckoutFor;
@@ -122,11 +189,14 @@ export default function Tables() {
         // Cap at 60 minutes
         const cappedMs = Math.min(elapsedMs, 60 * 60000);
         const minsElapsed = cappedMs / 60000;
-        const playedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
+        const rawPlayedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
+        // Enforce minimum ₹50 for playing time
+        const playedCost = Math.max(rawPlayedCost, MIN_PLAY_COST);
         const foodCost = (tableInfo.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
 
-        // Save to history
+        // Save to history — scoped to this club
         const historyItem = {
+            clubId,
             tableName: tableInfo.name,
             type: tableInfo.type,
             playedCost,
@@ -134,8 +204,11 @@ export default function Tables() {
             totalCost: playedCost + foodCost,
             date: new Date().toLocaleString(),
             orders: tableInfo.orders || [],
+            durationMins: parseFloat(minsElapsed.toFixed(1)),
+            activeControllers: tableInfo.activeControllers || null,
             createdAt: Date.now()
         };
+
 
         try {
             await addDoc(collection(db, 'session_history'), historyItem);
@@ -176,11 +249,12 @@ export default function Tables() {
                 }
             });
             const newTable = {
+                clubId,
                 type,
                 name: newTableName,
                 status: 'free',
                 startTime: null,
-                rate: controllerRates['1'] || 0, // default rate = 1 controller rate
+                rate: controllerRates['1'] || 0,
                 controllerRates,
                 activeControllers: 1,
                 customer: '',
@@ -205,6 +279,7 @@ export default function Tables() {
             const ratePerMinute = parseFloat((parseFloat(newTableRate) / 60).toFixed(4));
             const newId = Date.now().toString();
             const newTable = {
+                clubId,
                 type,
                 name: newTableName,
                 status: 'free',
@@ -302,7 +377,6 @@ export default function Tables() {
             <div className="page-header">
                 <div>
                     <h2>Tables & Sessions</h2>
-                    <p className="text-muted">Manage active games. 60 min bounds apply.</p>
                 </div>
                 <div className="header-actions">
                     {(() => {
@@ -371,6 +445,29 @@ export default function Tables() {
             </div>
 
             <div className="tables-grid">
+                {filteredTables.length === 0 && (
+                    <div style={{
+                        gridColumn: '1 / -1',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '4rem 2rem',
+                        gap: '1rem',
+                        color: 'var(--text-muted)',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{ fontSize: '3rem', opacity: 0.4 }}>🎱</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {tables.length === 0 ? 'No tables yet' : 'No tables match your search'}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+                            {tables.length === 0
+                                ? 'Click "+ Add New Table" to set up your first table.'
+                                : 'Try a different search or filter.'}
+                        </div>
+                    </div>
+                )}
                 {filteredTables.map(table => {
                     const isOccupied = table.status === 'occupied';
                     const elapsedMs = isOccupied ? Math.max(0, currentTime - table.startTime) : 0;
@@ -459,7 +556,18 @@ export default function Tables() {
                                         <Square size={20} fill="#fff" className="mr-2" /> End Session
                                     </button>
                                 ) : (
-                                    <button className="tc-action-circle bg-green tooltip-container" onClick={() => handleStart(table.id)} title="Start Session" style={{ width: '100%', borderRadius: '8px' }}>
+                                    <button
+                                        className="tc-action-circle bg-green tooltip-container"
+                                        onClick={() => {
+                                            if (table.type === 'Play Station' && table.controllerRates) {
+                                                setShowPsStartModal(table);
+                                            } else {
+                                                handleStart(table.id);
+                                            }
+                                        }}
+                                        title="Start Session"
+                                        style={{ width: '100%', borderRadius: '8px' }}
+                                    >
                                         <Play size={20} fill="#fff" className="mr-2" /> Start Session
                                     </button>
                                 )}
@@ -542,13 +650,52 @@ export default function Tables() {
                 );
             })(), document.body)}
 
+            {/* PS PLAYER COUNT MODAL */}
+            {showPsStartModal && createPortal((() => {
+                const psTable = showPsStartModal;
+                const availableRates = psTable.controllerRates || {};
+                const availableCounts = Object.keys(availableRates).map(Number).sort((a,b) => a-b);
+                return (
+                    <div className="overlay" onClick={() => setShowPsStartModal(null)}>
+                        <div className="modal modal-relative ps-start-modal" onClick={e => e.stopPropagation()}>
+                            <button className="modal-close-btn" onClick={() => setShowPsStartModal(null)}>
+                                <X size={18} />
+                            </button>
+                            <div className="ps-start-header">
+                                <div className="ps-start-icon">🎮</div>
+                                <h3 className="text-xl font-bold">How many people are playing?</h3>
+                                <p className="text-muted text-sm">Select the number of players to apply the correct rate.</p>
+                            </div>
+                            <div className="ps-player-grid">
+                                {availableCounts.map(count => {
+                                    const hourlyRate = (availableRates[count] * 60).toFixed(0);
+                                    return (
+                                        <button
+                                            key={count}
+                                            className="ps-player-btn"
+                                            onClick={() => handlePsStartConfirm(psTable, count)}
+                                        >
+                                            <span className="ps-player-emoji">{count === 1 ? '👤' : count === 2 ? '👥' : '👥'}</span>
+                                            <span className="ps-player-count">{count} {count === 1 ? 'Player' : 'Players'}</span>
+                                            <span className="ps-player-rate">₹{hourlyRate}/hr</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })(), document.body)}
+
             {/* CHECKOUT MODAL — portal */}
             {showCheckoutFor && createPortal((() => {
                 const tableInfo = showCheckoutFor;
                 const elapsedMs = Math.max(0, currentTime - tableInfo.startTime);
                 const cappedMs = Math.min(elapsedMs, 60 * 60000);
                 const minsElapsed = cappedMs / 60000;
-                const playedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
+                const rawPlayedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
+                const playedCost = Math.max(rawPlayedCost, 50);
+                const minimumApplied = rawPlayedCost < 50;
                 const foodCost = (tableInfo.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
                 const total = playedCost + foodCost;
 
@@ -566,9 +713,14 @@ export default function Tables() {
 
                             <div className="checkout-receipt">
                                 <div className="receipt-row">
-                                    <span className="receipt-label">Table ({minsElapsed.toFixed(0)} min × ₹{tableInfo.rate}/min)</span>
+                                    <span className="receipt-label">Table ({minsElapsed.toFixed(0)} min × ₹{tableInfo.rate.toFixed(2)}/min)</span>
                                     <span className="receipt-value">₹{playedCost.toFixed(2)}</span>
                                 </div>
+                                {minimumApplied && (
+                                    <div className="receipt-minimum-note">
+                                        ⚠️ Minimum charge of ₹50 applied
+                                    </div>
+                                )}
 
                                 {(tableInfo.orders || []).length > 0 && (
                                     <>

@@ -3,7 +3,6 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
-  sendSignInLinkToEmail,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
@@ -25,16 +24,7 @@ import {
 } from 'lucide-react';
 import './AuthPage.css';
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-// Firebase action code settings for email link sign-in
-const ACTION_CODE_SETTINGS = {
-  // Change this URL to your actual deployed domain in production.
-  // For local dev, localhost:5173 works fine.
-  url: window.location.origin + '/',
-  handleCodeInApp: true,
-};
-
-// Password strength checker
+// ─── Password strength ────────────────────────────────────────────────────────
 function getPasswordStrength(pw) {
   if (!pw) return { level: 0, label: '' };
   let score = 0;
@@ -42,29 +32,29 @@ function getPasswordStrength(pw) {
   if (/[A-Z]/.test(pw)) score++;
   if (/[0-9]/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
-  const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+  const labels  = ['', 'Weak', 'Fair', 'Good', 'Strong'];
   const classes = ['', 'active-weak', 'active-fair', 'active-good', 'active-strong'];
   return { level: score, label: labels[score], cls: classes[score] };
 }
 
-// Friendly Firebase error messages
+// ─── Friendly Firebase error messages ─────────────────────────────────────────
 function friendlyError(code) {
   const map = {
-    'auth/user-not-found': 'No account found with this email.',
-    'auth/wrong-password': 'Incorrect password. Please try again.',
-    'auth/invalid-credential': 'Incorrect email or password.',
-    'auth/email-already-in-use': 'This email is already registered. Try logging in.',
-    'auth/weak-password': 'Password must be at least 6 characters.',
-    'auth/invalid-email': 'Please enter a valid email address.',
-    'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
-    'auth/network-request-failed': 'Network error. Please check your connection.',
+    'auth/user-not-found':        'No account found with this email.',
+    'auth/wrong-password':        'Incorrect password. Please try again.',
+    'auth/invalid-credential':    'Incorrect email or password.',
+    'auth/email-already-in-use':  'This email is already registered. Try logging in.',
+    'auth/weak-password':         'Password must be at least 6 characters.',
+    'auth/invalid-email':         'Please enter a valid email address.',
+    'auth/too-many-requests':     'Too many attempts. Please wait a moment and try again.',
+    'auth/network-request-failed':'Network error. Please check your connection.',
   };
   return map[code] || 'Something went wrong. Please try again.';
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Shared sub-components ────────────────────────────────────────────────────
 
-function PasswordInput({ id, value, onChange, placeholder, label }) {
+function PasswordInput({ id, value, onChange, placeholder, label, autoComplete }) {
   const [show, setShow] = useState(false);
   return (
     <div className="auth-field">
@@ -78,7 +68,7 @@ function PasswordInput({ id, value, onChange, placeholder, label }) {
           placeholder={placeholder || 'Password'}
           value={value}
           onChange={onChange}
-          autoComplete="current-password"
+          autoComplete={autoComplete || 'current-password'}
         />
         <button
           type="button"
@@ -101,10 +91,7 @@ function StrengthMeter({ password }) {
     <div style={{ marginTop: '-0.5rem' }}>
       <div className="pw-strength">
         {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className={`pw-strength-bar ${i <= level ? cls : ''}`}
-          />
+          <div key={i} className={`pw-strength-bar ${i <= level ? cls : ''}`} />
         ))}
       </div>
       <div className="pw-strength-label">{label}</div>
@@ -122,36 +109,22 @@ function ErrorMsg({ msg }) {
   );
 }
 
-function SuccessMsg({ msg }) {
-  if (!msg) return null;
-  return (
-    <div className="auth-success" role="status">
-      <CheckCircle2 size={14} style={{ marginTop: '1px', flexShrink: 0 }} />
-      {msg}
-    </div>
-  );
-}
+// ─── VIEW 1: Login ────────────────────────────────────────────────────────────
 
-// ─── Views ───────────────────────────────────────────────────────────────────
-
-// VIEW 1: Login
 function LoginView({ onForgotPassword, onRegister }) {
-  const [email, setEmail]       = useState('');
+  const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState('');
 
   async function handleLogin(e) {
     e.preventDefault();
     setError('');
-    if (!email || !password) {
-      setError('Please enter your email and password.');
-      return;
-    }
+    if (!email || !password) { setError('Please enter your email and password.'); return; }
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // AuthContext listener handles redirect
+      // AuthContext listener detects the user and App.jsx redirects to /tables
     } catch (err) {
       setError(friendlyError(err.code));
     } finally {
@@ -192,17 +165,10 @@ function LoginView({ onForgotPassword, onRegister }) {
         />
 
         <div className="auth-forgot">
-          <button type="button" onClick={onForgotPassword}>
-            Forgot password?
-          </button>
+          <button type="button" onClick={onForgotPassword}>Forgot password?</button>
         </div>
 
-        <button
-          id="login-submit-btn"
-          type="submit"
-          className="auth-btn-primary"
-          disabled={loading}
-        >
+        <button id="login-submit-btn" type="submit" className="auth-btn-primary" disabled={loading}>
           {loading ? <span className="auth-spinner" /> : <LogIn size={16} />}
           {loading ? 'Signing in…' : 'Sign In'}
         </button>
@@ -212,20 +178,19 @@ function LoginView({ onForgotPassword, onRegister }) {
 
       <div className="auth-switch">
         New here?
-        <button type="button" onClick={onRegister}>
-          Create your account →
-        </button>
+        <button type="button" onClick={onRegister}>Create your club →</button>
       </div>
     </div>
   );
 }
 
-// VIEW 2: Forgot Password
+// ─── VIEW 2: Forgot Password ──────────────────────────────────────────────────
+
 function ForgotPasswordView({ onBack }) {
-  const [email, setEmail]     = useState('');
+  const [email,   setEmail]   = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const [sent, setSent]       = useState(false);
+  const [error,   setError]   = useState('');
+  const [sent,    setSent]    = useState(false);
 
   async function handleReset(e) {
     e.preventDefault();
@@ -245,15 +210,17 @@ function ForgotPasswordView({ onBack }) {
   if (sent) {
     return (
       <div className="auth-view auth-email-sent">
-        <div className="auth-email-icon">
-          <Mail size={32} />
-        </div>
-        <h2>Check your inbox</h2>
+        <div className="auth-email-icon"><Mail size={32} /></div>
+        <h2>Reset link sent!</h2>
         <p>
-          We've sent a password reset link to<br />
+          We've sent a <strong>password reset link</strong> to<br />
           <strong>{email}</strong>.<br /><br />
-          Click the link in the email to create a new password.
-          Check your spam folder if you don't see it.
+          Open that email and click the link inside to set a new password.
+          <br /><br />
+          {/* <span style={{ color: '#f59e0b', fontSize: '0.8rem' }}>
+            ⚠ Not seeing it? Check your <strong>Spam / Junk</strong> folder.
+            The email comes from <em>noreply@…firebaseapp.com</em>.
+          </span> */}
         </p>
         <button className="auth-btn-primary" onClick={onBack} style={{ maxWidth: 260, margin: '0 auto' }}>
           <ArrowLeft size={15} /> Back to Sign In
@@ -270,7 +237,7 @@ function ForgotPasswordView({ onBack }) {
 
       <p className="auth-title">Reset your password</p>
       <p className="auth-subtitle">
-        Enter the email address linked to your account and we'll send you a reset link.
+        Enter the email linked to your account and we'll send you a reset link.
       </p>
 
       <form className="auth-form" onSubmit={handleReset} noValidate>
@@ -292,12 +259,7 @@ function ForgotPasswordView({ onBack }) {
           </div>
         </div>
 
-        <button
-          id="reset-submit-btn"
-          type="submit"
-          className="auth-btn-primary"
-          disabled={loading}
-        >
+        <button id="reset-submit-btn" type="submit" className="auth-btn-primary" disabled={loading}>
           {loading ? <span className="auth-spinner" /> : <Send size={15} />}
           {loading ? 'Sending…' : 'Send Reset Link'}
         </button>
@@ -306,20 +268,20 @@ function ForgotPasswordView({ onBack }) {
   );
 }
 
-// VIEW 3: Register
+// ─── VIEW 3: Create Club (Register) ──────────────────────────────────────────
+
 function RegisterView({ onBack }) {
   const [form, setForm] = useState({
-    ownerName: '',
-    clubName: '',
-    phone: '',
-    email: '',
-    address: '',
-    password: '',
+    ownerName:       '',
+    clubName:        '',
+    phone:           '',
+    city:            '',
+    email:           '',
+    password:        '',
     confirmPassword: '',
   });
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
-  const [linkSent, setLinkSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
 
   function update(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -329,7 +291,7 @@ function RegisterView({ onBack }) {
     e.preventDefault();
     setError('');
 
-    const { ownerName, clubName, phone, email, address, password, confirmPassword } = form;
+    const { ownerName, clubName, phone, city, email, password, confirmPassword } = form;
 
     if (!ownerName || !clubName || !phone || !email || !password) {
       setError('Please fill in all required fields.');
@@ -348,49 +310,27 @@ function RegisterView({ onBack }) {
     try {
       // 1. Create Firebase Auth account
       const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const uid  = cred.user.uid;
 
-      // 2. Save club profile to Firestore
-      await setDoc(doc(db, 'clubs', cred.user.uid), {
-        ownerName,
+      // 2. Save club profile. clubId === uid for data isolation.
+      await setDoc(doc(db, 'clubs', uid), {
+        clubId:    uid,
+        ownerId:   uid,
         clubName,
-        phone,
+        ownerName,
         email,
-        address,
-        uid: cred.user.uid,
+        phone,
+        city,
         createdAt: serverTimestamp(),
       });
 
-      // 3. Send email verification link (Firebase built-in)
-      await sendSignInLinkToEmail(auth, email, ACTION_CODE_SETTINGS);
-      window.localStorage.setItem('emailForSignIn', email);
-
-      setLinkSent(true);
+      // 3. Auth state listener in AuthContext fires automatically,
+      //    sets currentUser, and App.jsx's PublicRoute redirects to /tables.
+      //    No extra navigation needed here.
     } catch (err) {
       setError(friendlyError(err.code));
-    } finally {
       setLoading(false);
     }
-  }
-
-  // After successful registration, show email-sent screen
-  if (linkSent) {
-    return (
-      <div className="auth-view auth-email-sent">
-        <div className="auth-email-icon">
-          <CheckCircle2 size={32} />
-        </div>
-        <h2>Account Created! 🎉</h2>
-        <p>
-          Welcome to Pocket 6! A verification link has been sent to<br />
-          <strong>{form.email}</strong>.<br /><br />
-          Click the link in your inbox to verify and sign in.
-          You can also sign in directly below using your password.
-        </p>
-        <button className="auth-btn-primary" onClick={onBack} style={{ maxWidth: 260, margin: '0 auto' }}>
-          <ArrowLeft size={15} /> Go to Sign In
-        </button>
-      </div>
-    );
   }
 
   const strength = getPasswordStrength(form.password);
@@ -401,7 +341,7 @@ function RegisterView({ onBack }) {
         <ArrowLeft size={14} /> Back to sign in
       </button>
 
-      <p className="auth-title">Create your account</p>
+      <p className="auth-title">Create your club</p>
       <p className="auth-subtitle">Set up your venue on Pocket 6 in seconds</p>
 
       <form className="auth-form" onSubmit={handleRegister} noValidate>
@@ -441,24 +381,41 @@ function RegisterView({ onBack }) {
           </div>
         </div>
 
-        {/* Row 2: Phone */}
-        <div className="auth-field">
-          <label htmlFor="reg-phone">Phone Number *</label>
-          <div className="auth-input-wrap">
-            <Phone className="input-icon" size={16} />
-            <input
-              id="reg-phone"
-              type="tel"
-              className="auth-input"
-              placeholder="+91 98765 43210"
-              value={form.phone}
-              onChange={update('phone')}
-              autoComplete="tel"
-            />
+        {/* Row 2: Phone + City */}
+        <div className="auth-grid-2">
+          <div className="auth-field">
+            <label htmlFor="reg-phone">Phone Number *</label>
+            <div className="auth-input-wrap">
+              <Phone className="input-icon" size={16} />
+              <input
+                id="reg-phone"
+                type="tel"
+                className="auth-input"
+                placeholder="+91 98765 43210"
+                value={form.phone}
+                onChange={update('phone')}
+                autoComplete="tel"
+              />
+            </div>
+          </div>
+
+          <div className="auth-field">
+            <label htmlFor="reg-city">City</label>
+            <div className="auth-input-wrap">
+              <MapPin className="input-icon" size={16} />
+              <input
+                id="reg-city"
+                type="text"
+                className="auth-input"
+                placeholder="Mumbai, Delhi…"
+                value={form.city}
+                onChange={update('city')}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Row 3: Email */}
+        {/* Email */}
         <div className="auth-field">
           <label htmlFor="reg-email">Email Address *</label>
           <div className="auth-input-wrap">
@@ -475,24 +432,7 @@ function RegisterView({ onBack }) {
           </div>
         </div>
 
-        {/* Row 4: Address */}
-        <div className="auth-field">
-          <label htmlFor="reg-address">Address</label>
-          <div className="auth-input-wrap">
-            <MapPin className="input-icon" size={16} />
-            <input
-              id="reg-address"
-              type="text"
-              className="auth-input"
-              placeholder="123 MG Road, Bangalore"
-              value={form.address}
-              onChange={update('address')}
-              autoComplete="street-address"
-            />
-          </div>
-        </div>
-
-        {/* Row 5: Password */}
+        {/* Password */}
         <div className="auth-field">
           <label htmlFor="reg-password">Password *</label>
           <div className="auth-input-wrap">
@@ -510,7 +450,7 @@ function RegisterView({ onBack }) {
         </div>
         {form.password && <StrengthMeter password={form.password} />}
 
-        {/* Row 6: Confirm Password */}
+        {/* Confirm Password */}
         <div className="auth-field">
           <label htmlFor="reg-confirm">Confirm Password *</label>
           <div className="auth-input-wrap">
@@ -534,7 +474,7 @@ function RegisterView({ onBack }) {
           disabled={loading || strength.level < 1}
         >
           {loading ? <span className="auth-spinner" /> : <UserPlus size={16} />}
-          {loading ? 'Creating account…' : 'Create Account'}
+          {loading ? 'Creating club…' : 'Create Club & Sign In'}
         </button>
       </form>
     </div>
@@ -544,12 +484,11 @@ function RegisterView({ onBack }) {
 // ─── Main Auth Page ───────────────────────────────────────────────────────────
 
 export default function AuthPage() {
-  // 'login' | 'forgot' | 'register'
   const [view, setView] = useState('login');
 
   return (
     <div className="auth-root">
-      {/* Background */}
+      {/* Animated background */}
       <div className="auth-orb auth-orb-1" />
       <div className="auth-orb auth-orb-2" />
       <div className="auth-orb auth-orb-3" />
@@ -560,7 +499,6 @@ export default function AuthPage() {
         {/* Brand */}
         <div className="auth-brand">
           <div className="auth-logo">
-            {/* Billiard / cue ball icon SVG */}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <circle cx="12" cy="12" r="4" />
@@ -569,22 +507,12 @@ export default function AuthPage() {
             </svg>
           </div>
           <h1>Pocket 6</h1>
-          <p>Venue Management System</p>
+          {/* <p>Venue Management System</p> */}
         </div>
 
-        {/* View Router */}
-        {view === 'login' && (
-          <LoginView
-            onForgotPassword={() => setView('forgot')}
-            onRegister={() => setView('register')}
-          />
-        )}
-        {view === 'forgot' && (
-          <ForgotPasswordView onBack={() => setView('login')} />
-        )}
-        {view === 'register' && (
-          <RegisterView onBack={() => setView('login')} />
-        )}
+        {view === 'login'    && <LoginView    onForgotPassword={() => setView('forgot')} onRegister={() => setView('register')} />}
+        {view === 'forgot'   && <ForgotPasswordView onBack={() => setView('login')} />}
+        {view === 'register' && <RegisterView onBack={() => setView('login')} />}
       </div>
     </div>
   );

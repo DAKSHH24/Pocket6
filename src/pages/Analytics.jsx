@@ -7,9 +7,10 @@ import {
     TrendingUp, Table, CupSoda, Lock, FileClock, Trash2, Plus, Receipt, Box, Wrench, X, Tag, ShoppingCart, DollarSign, Calendar, ChevronDown, KeyRound, RotateCcw, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import {
-    collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy
+    collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, where
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { useAuth } from '../context/AuthContext';
 import './Analytics.css';
 
 // ─────────────────────────────────────────────────────────────────
@@ -31,8 +32,6 @@ const QUICK_PRESETS = [
     { label: 'All Time', value: 'all' },
     { label: 'Last 15 Days', value: '15d' },
     { label: 'Last 30 Days', value: '30d' },
-    { label: 'This Month', value: 'month' },
-    { label: 'This Year', value: 'year' },
 ];
 
 // Stored PIN key
@@ -230,24 +229,6 @@ function PeriodFilterBar({ dateStart, dateEnd, preset, tableFilter, allTableName
                     </div>
                 </div>
             </div>
-
-            {/* Table selector */}
-            <div className="period-section">
-                <span className="period-label">Table</span>
-                <div className="period-table-select-wrap">
-                    <select
-                        className="period-table-select"
-                        value={tableFilter}
-                        onChange={e => onTableFilter(e.target.value)}
-                    >
-                        <option value="All">All Tables</option>
-                        {allTableNames.map(n => (
-                            <option key={n} value={n}>{n}</option>
-                        ))}
-                    </select>
-                    <ChevronDown size={14} className="period-table-chevron" />
-                </div>
-            </div>
         </div>
     );
 }
@@ -256,6 +237,7 @@ function PeriodFilterBar({ dateStart, dateEnd, preset, tableFilter, allTableName
 // MAIN ANALYTICS COMPONENT
 // ─────────────────────────────────────────────────────────────────
 export default function Analytics() {
+    const { clubId } = useAuth();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [activeTab, setActiveTab] = useState('Overview');
 
@@ -283,23 +265,25 @@ export default function Analytics() {
     useEffect(() => { setIsAuthenticated(false); }, []);
 
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!isAuthenticated || !clubId) return;
         const unsubHistory = onSnapshot(
-            query(collection(db, 'session_history'), orderBy('createdAt', 'desc')),
+            query(collection(db, 'session_history'), where('clubId', '==', clubId), orderBy('createdAt', 'desc')),
             (snap) => { const d = []; snap.forEach(x => d.push({ id: x.id, ...x.data() })); setHistory(d); }
         );
-        const unsubInventory = onSnapshot(collection(db, 'inventory'),
+        const unsubInventory = onSnapshot(
+            query(collection(db, 'inventory'), where('clubId', '==', clubId)),
             (snap) => { const d = []; snap.forEach(x => d.push({ id: x.id, ...x.data() })); setInventory(d); }
         );
         const unsubExpenses = onSnapshot(
-            query(collection(db, 'expenses'), orderBy('createdAt', 'desc')),
+            query(collection(db, 'expenses'), where('clubId', '==', clubId), orderBy('createdAt', 'desc')),
             (snap) => { const d = []; snap.forEach(x => d.push({ id: x.id, ...x.data() })); setExpenses(d); }
         );
-        const unsubTables = onSnapshot(collection(db, 'tables'),
+        const unsubTables = onSnapshot(
+            query(collection(db, 'tables'), where('clubId', '==', clubId)),
             (snap) => { const d = []; snap.forEach(x => d.push({ id: x.id, ...x.data() })); setTables(d); }
         );
         return () => { unsubHistory(); unsubInventory(); unsubExpenses(); unsubTables(); };
-    }, [isAuthenticated]);
+    }, [isAuthenticated, clubId]);
 
     useEffect(() => {
         if (showExpenseModal) document.body.style.overflow = 'hidden';
@@ -467,6 +451,7 @@ export default function Analytics() {
         if (!expAmount || !expDesc) return;
         try {
             await addDoc(collection(db, 'expenses'), {
+                clubId,
                 amount: parseFloat(expAmount), category: expCategory,
                 description: expDesc, date: new Date().toLocaleDateString(), createdAt: Date.now()
             });
@@ -488,7 +473,6 @@ export default function Analytics() {
             <div className="page-header mb-4">
                 <div>
                     <h2>Financial Analytics & Reports</h2>
-                    <p className="text-muted">Proactive operational metrics, F&B tracking, and live revenues.</p>
                 </div>
             </div>
 
@@ -507,7 +491,7 @@ export default function Analytics() {
             {activeTab === 'Overview' && (
                 <div className="analytics-section">
                     {/* KPI Cards */}
-                    <div className="analytics-kpi-grid">
+                    <div className="analytics-kpi-grid cols-3">
                         <div className="glass-panel kpi-card">
                             <div className="kpi-label">Total Revenue</div>
                             <div className="kpi-value text-glow-green">₹{totalRev.toFixed(0)}</div>
@@ -519,11 +503,6 @@ export default function Analytics() {
                                 ₹{(totalRev - totalExp).toFixed(0)}
                             </div>
                             <div className="kpi-sub">Revenue minus Expenses</div>
-                        </div>
-                        <div className="glass-panel kpi-card">
-                            <div className="kpi-label">Live Session Revenue</div>
-                            <div className="kpi-value text-glow-blue">₹{liveRev.toFixed(0)}</div>
-                            <div className="kpi-sub">{liveSessions.length} tables playing currently</div>
                         </div>
                         <div className="glass-panel kpi-card">
                             <div className="kpi-label">Average Daily Revenue</div>
@@ -610,13 +589,49 @@ export default function Analytics() {
                         <h3 className="chart-title">Play Revenue by Specific Table</h3>
                         {tableRevData.length > 0 ? (
                             <>
-                                <ResponsiveContainer width="100%" height={280}>
-                                    <BarChart data={tableRevData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <BarChart data={tableRevData} margin={{ top: 10, right: 20, left: -10, bottom: 30 }} style={{ background: 'transparent' }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                                        <XAxis dataKey="name" stroke="var(--text-muted)" axisLine={false} tickLine={false} />
+                                        <XAxis
+                                            dataKey="name"
+                                            stroke="var(--text-muted)"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            interval={0}
+                                            height={50}
+                                            tick={({ x, y, payload }) => {
+                                                const words = payload.value.split(' ');
+                                                return (
+                                                    <text
+                                                        x={x}
+                                                        y={y + 4}
+                                                        fill="var(--text-muted)"
+                                                        textAnchor="middle"
+                                                        fontSize={12}
+                                                        dominantBaseline="hanging"
+                                                    >
+                                                        {words.map((word, i) => (
+                                                            <tspan key={i} x={x} dy={i === 0 ? 0 : 15}>{word}</tspan>
+                                                        ))}
+                                                    </text>
+                                                );
+                                            }}
+                                        />
                                         <YAxis stroke="var(--text-muted)" axisLine={false} tickLine={false} />
-                                        <Tooltip formatter={(value) => `₹${value}`} />
-                                        <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Play Revenue" />
+                                        <Tooltip
+                                            cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                                            content={({ active, payload }) => {
+                                                if (!active || !payload?.length) return null;
+                                                const d = payload[0].payload;
+                                                return (
+                                                    <div style={{ background: 'rgba(15,15,15,0.95)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                                                        <div style={{ fontWeight: 700, fontSize: 13, color: '#f3f4f6' }}>{d.name}</div>
+                                                        <div style={{ fontSize: 13, color: '#3b82f6', fontWeight: 600 }}>Play Revenue : ₹{d.revenue}</div>
+                                                    </div>
+                                                );
+                                            }}
+                                        />
+                                        <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Play Revenue" maxBarSize={48} />
                                     </BarChart>
                                 </ResponsiveContainer>
 
@@ -690,6 +705,8 @@ export default function Analytics() {
                                     data={topSellingItems.slice(0, 8)}
                                     layout="vertical"
                                     margin={{ top: 10, right: 60, left: 20, bottom: 10 }}
+                                    barCategoryGap="30%"
+                                    style={{ background: 'transparent' }}
                                 >
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.05)" />
                                     <XAxis type="number" stroke="var(--text-muted)" axisLine={false} tickLine={false} />
@@ -700,10 +717,22 @@ export default function Analytics() {
                                         axisLine={false}
                                         tickLine={false}
                                         width={140}
-                                        tick={{ fontSize: 13 }}
+                                        tick={{ fontSize: 13, fill: 'var(--text-muted)' }}
                                     />
-                                    <Tooltip formatter={(v, n, p) => [`${v} units`, p.payload.name]} />
-                                    <Bar dataKey="qty" fill="#10b981" radius={[0, 6, 6, 0]} name="Units Sold"
+                                    <Tooltip
+                                        cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                                        content={({ active, payload }) => {
+                                            if (!active || !payload?.length) return null;
+                                            const d = payload[0].payload;
+                                            return (
+                                                <div style={{ background: 'rgba(15,15,15,0.95)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                                                    <div style={{ fontWeight: 700, fontSize: 13, color: '#f3f4f6' }}>{d.name}</div>
+                                                    <div style={{ fontSize: 13, color: '#10b981', fontWeight: 600 }}>{d.qty} units</div>
+                                                </div>
+                                            );
+                                        }}
+                                    />
+                                    <Bar dataKey="qty" fill="#10b981" radius={[0, 6, 6, 0]} name="Units Sold" maxBarSize={22}
                                         label={{ position: 'right', fill: '#9ca3af', fontSize: 12, formatter: v => v }} />
                                 </BarChart>
                             </ResponsiveContainer>
