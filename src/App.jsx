@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Tables from './pages/Tables';
 import FoodDrinks from './pages/FoodDrinks';
 import Analytics from './pages/Analytics';
+import Bills from './pages/Bills';
 import AuthPage from './pages/auth/AuthPage';
 
 // Guard: redirects to /auth if not authenticated
@@ -70,6 +71,7 @@ function AppRoutes() {
         <Route path="tables" element={<Tables />} />
         <Route path="food" element={<FoodDrinks />} />
         <Route path="analytics" element={<Analytics />} />
+        <Route path="bills" element={<Bills />} />
         <Route path="expenses" element={<Navigate to="/analytics" replace />} />
       </Route>
 

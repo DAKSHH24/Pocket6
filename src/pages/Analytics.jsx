@@ -335,14 +335,19 @@ export default function Analytics() {
         return true;
     });
 
+    // Only sessions that were actually paid count toward revenue
+    const paidHistory = filteredHistory.filter(h => h.paymentStatus !== 'due');
+    const dueHistory  = filteredHistory.filter(h => h.paymentStatus === 'due');
+
     const filteredExpenses = expenses.filter(e => {
         const ts = e.createdAt || 0;
         return ts >= tsStart && ts <= tsEnd;
     });
 
-    const totalRev   = filteredHistory.reduce((s, h) => s + (h.totalCost  || 0), 0);
-    const tableRev   = filteredHistory.reduce((s, h) => s + (h.playedCost || 0), 0);
-    const canteenRev = filteredHistory.reduce((s, h) => s + (h.foodCost   || 0), 0);
+    const totalRev   = paidHistory.reduce((s, h) => s + (h.totalCost  || 0), 0);
+    const tableRev   = paidHistory.reduce((s, h) => s + (h.playedCost || 0), 0);
+    const canteenRev = paidHistory.reduce((s, h) => s + (h.foodCost   || 0), 0);
+    const totalDueAmt = dueHistory.reduce((s, h) => s + (h.totalCost  || 0), 0);
 
     const liveSessions = tables.filter(t => t.status === 'occupied');
     const liveRev = liveSessions.reduce((sum, t) => {
@@ -352,7 +357,7 @@ export default function Analytics() {
     }, 0);
 
     let snacksRev = 0, drinksRev = 0, tobaccoRev = 0;
-    filteredHistory.forEach(h => {
+    paidHistory.forEach(h => {
         if (h.categoryBreakdown) {
             snacksRev  += h.categoryBreakdown['Snacks']          || 0;
             drinksRev  += h.categoryBreakdown['Drinks']          || 0;
@@ -367,7 +372,7 @@ export default function Analytics() {
         }
     });
 
-    const uniqueDays = new Set(filteredHistory.map(h => h.createdAt ? new Date(h.createdAt).toLocaleDateString() : '')).size || 1;
+    const uniqueDays = new Set(paidHistory.map(h => h.createdAt ? new Date(h.createdAt).toLocaleDateString() : '')).size || 1;
     const avgDailyRev = totalRev / uniqueDays;
 
     const dayRevenueMap = {};
@@ -379,9 +384,9 @@ export default function Analytics() {
     let peakDay = 'N/A', peakDayRev = 0;
     Object.entries(dayRevenueMap).forEach(([day, rev]) => { if (rev > peakDayRev) { peakDayRev = rev; peakDay = day; } });
 
-    // Table stats map
+    // Table stats map — only paid sessions
     const tableSessionsMap = {};
-    filteredHistory.forEach(h => {
+    paidHistory.forEach(h => {
         const name = h.tableName || 'Unknown';
         if (!tableSessionsMap[name]) tableSessionsMap[name] = { sessions: 0, revenue: 0, foodRevenue: 0 };
         tableSessionsMap[name].sessions++;
@@ -392,10 +397,10 @@ export default function Analytics() {
         .map(([name, stat]) => ({ name, revenue: Math.round(stat.revenue), sessions: stat.sessions, foodRev: Math.round(stat.foodRevenue) }))
         .sort((a, b) => b.revenue - a.revenue);
 
-    // F&B
+    // F&B — only paid sessions
     const fbStats = {};
     let totalInvConsumptionCost = 0;
-    filteredHistory.forEach(h => {
+    paidHistory.forEach(h => {
         (h.orders || []).forEach(o => {
             if (!fbStats[o.name]) fbStats[o.name] = { qty: 0, revenue: 0, cost: 0, category: o.category || 'Snacks' };
             fbStats[o.name].qty     += o.qty;
@@ -424,13 +429,15 @@ export default function Analytics() {
     const totalFBSoldRevenue = snacksRev + drinksRev + tobaccoRev;
     const fbProfitMargin     = totalFBSoldRevenue - totalInvConsumptionCost;
 
-    // 7-day trend
+    // 7-day trend — paid sessions only
     const trendData = [];
     for (let i = 6; i >= 0; i--) {
         const d = new Date(); d.setDate(d.getDate() - i);
         const dayLabel  = d.toLocaleDateString('en-US', { weekday: 'short' });
         const dateString = d.toLocaleDateString();
-        const rev = history.filter(h => h.date && h.date.includes(dateString)).reduce((s, h) => s + (h.totalCost || 0), 0);
+        const rev = history
+            .filter(h => h.date && h.date.includes(dateString) && h.paymentStatus !== 'due')
+            .reduce((s, h) => s + (h.totalCost || 0), 0);
         const exp = expenses.filter(e => e.date && e.date.includes(dateString)).reduce((s, e) => s + (e.amount || 0), 0);
         trendData.push({ name: dayLabel, revenue: Math.round(rev), expense: Math.round(exp) });
     }
@@ -493,9 +500,9 @@ export default function Analytics() {
                     {/* KPI Cards */}
                     <div className="analytics-kpi-grid cols-3">
                         <div className="glass-panel kpi-card">
-                            <div className="kpi-label">Total Revenue</div>
+                            <div className="kpi-label">Total Revenue (Paid)</div>
                             <div className="kpi-value text-glow-green">₹{totalRev.toFixed(0)}</div>
-                            <div className="kpi-sub">{filteredHistory.length} sessions completed</div>
+                            <div className="kpi-sub">{paidHistory.length} sessions paid</div>
                         </div>
                         <div className="glass-panel kpi-card">
                             <div className="kpi-label">Net Profit / Margin</div>
@@ -509,6 +516,13 @@ export default function Analytics() {
                             <div className="kpi-value text-glow-purple">₹{avgDailyRev.toFixed(0)}</div>
                             <div className="kpi-sub">Peak Day: {peakDay}</div>
                         </div>
+                        {totalDueAmt > 0 && (
+                            <div className="glass-panel kpi-card" style={{ borderLeft: '3px solid #f59e0b', background: 'linear-gradient(135deg, rgba(245,158,11,0.06) 0%, transparent 70%)' }}>
+                                <div className="kpi-label" style={{ color: '#f59e0b' }}>⚠ Outstanding Dues</div>
+                                <div className="kpi-value" style={{ color: '#f59e0b' }}>₹{totalDueAmt.toFixed(0)}</div>
+                                <div className="kpi-sub">{dueHistory.length} session{dueHistory.length !== 1 ? 's' : ''} unpaid — not counted in revenue</div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Revenue breakdown strip */}
@@ -875,10 +889,17 @@ export default function Analytics() {
                                             <div className="history-table-name">{item.tableName}</div>
                                             <div className="history-meta">
                                                 <span className="history-type-badge">{item.type || 'Table'}</span>
+                                                {item.personName && <span className="history-type-badge" style={{ background: 'rgba(99,179,237,0.12)', color: '#63b3ed', border: '1px solid rgba(99,179,237,0.25)' }}>👤 {item.personName}</span>}
+                                                {item.paymentStatus === 'due'
+                                                    ? <span className="history-type-badge" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>⚠ Due</span>
+                                                    : <span className="history-type-badge" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>✓ Paid</span>
+                                                }
                                                 <span className="history-date">{item.date}</span>
                                             </div>
                                         </div>
-                                        <div className="history-total text-glow-green">₹{(item.totalCost || 0).toFixed(2)}</div>
+                                        <div className={`history-total ${item.paymentStatus === 'due' ? '' : 'text-glow-green'}`} style={item.paymentStatus === 'due' ? { color: '#f59e0b' } : {}}>
+                                            ₹{(item.totalCost || 0).toFixed(2)}
+                                        </div>
                                     </div>
                                     <div className="history-card-breakdown">
                                         <span>🎱 Table playing: ₹{(item.playedCost || 0).toFixed(2)}</span>

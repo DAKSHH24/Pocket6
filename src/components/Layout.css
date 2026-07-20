@@ -105,7 +105,28 @@
     filter: drop-shadow(0 0 5px var(--neon-green-glow));
 }
 
+.nav-badge {
+    margin-left: auto;
+    background: rgba(239,68,68,0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 20px;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    min-width: 20px;
+    text-align: center;
+    line-height: 1.4;
+    animation: badge-pulse 2s infinite;
+}
+
+@keyframes badge-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
 .active-indicator {
+
     position: absolute;
     left: 0;
     top: 0;

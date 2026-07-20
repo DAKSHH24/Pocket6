@@ -1053,3 +1053,128 @@ select.glass-input {
     margin-top: 0.25rem;
     margin-bottom: 0.25rem;
 }
+
+/* ─── Checkout 3-Button Action Row ─── */
+.checkout-action-row {
+    display: flex;
+    gap: 0.6rem;
+    padding: 1rem 1.5rem 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.checkout-due-btn {
+    flex: 1;
+    padding: 0.75rem 0.5rem;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    background: rgba(99, 179, 237, 0.12);
+    color: #63b3ed;
+    border: 1px solid rgba(99, 179, 237, 0.35);
+    transition: background 0.18s, transform 0.15s;
+}
+
+.checkout-due-btn:hover:not(:disabled) {
+    background: rgba(99, 179, 237, 0.22);
+    transform: scale(1.02);
+}
+
+.checkout-due-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.checkout-paid-btn {
+    flex: 1;
+    padding: 0.75rem 0.5rem;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    transition: opacity 0.18s, transform 0.15s;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+}
+
+.checkout-paid-btn:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: scale(1.02);
+}
+
+.checkout-paid-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ─── Due Name Step ─── */
+.checkout-due-step {
+    padding: 0 1.5rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.due-step-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #63b3ed;
+    background: rgba(99, 179, 237, 0.08);
+    border: 1px solid rgba(99, 179, 237, 0.2);
+    border-radius: 8px;
+    padding: 0.6rem 0.9rem;
+}
+
+/* ─── Walk-in Order Button ─── */
+.walkin-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1.1rem;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 10px;
+    color: #38bdf8;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.18s, transform 0.15s;
+}
+
+.walkin-btn:hover {
+    background: rgba(56, 189, 248, 0.22);
+    transform: scale(1.02);
+}
+
+/* ─── Walk-in Modal: Name Row ─── */
+.walkin-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0 0 0.75rem;
+    padding: 0 0.25rem;
+}
+
+/* ─── Walk-in Total Row ─── */
+.walkin-total-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    background: rgba(16, 185, 129, 0.06);
+    border: 1px solid rgba(16, 185, 129, 0.15);
+    border-radius: 8px;
+    margin: 0.25rem 0;
+}
+
+.walkin-total-val {
+    font-size: 1.25rem;
+    font-weight: 800;
+    font-family: var(--font-heading);
+    color: #10b981;
+}

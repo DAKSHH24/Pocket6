@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Gamepad2, Coffee, LineChart, Menu, X, LogOut } from 'lucide-react';
+import { Gamepad2, Coffee, LineChart, Menu, X, LogOut, Receipt } from 'lucide-react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import './Layout.css';
 
 export default function Layout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const location = useLocation();
-    const { userProfile, currentUser, logout } = useAuth();
+    const { userProfile, currentUser, logout, clubId } = useAuth();
+    const [dueBillsCount, setDueBillsCount] = useState(0);
 
     // Derive display initials from profile or email
     const displayName = userProfile?.ownerName || currentUser?.email || 'Owner';
@@ -19,12 +22,27 @@ export default function Layout() {
         .slice(0, 2)
         .toUpperCase();
 
+    // Live count of unpaid bills for sidebar badge
+    useEffect(() => {
+        if (!clubId) return;
+        const q = query(
+            collection(db, 'bills'),
+            where('clubId', '==', clubId),
+            where('status', '==', 'due')
+        );
+        const unsub = onSnapshot(q, (snap) => {
+            setDueBillsCount(snap.size);
+        });
+        return () => unsub();
+    }, [clubId]);
+
     async function handleLogout() {
         await logout();
     }
 
     const navItems = [
         { name: 'Tables & Sessions',   path: '/tables',    icon: Gamepad2 },
+        { name: 'Bills & Dues',        path: '/bills',     icon: Receipt,  badge: dueBillsCount },
         { name: 'Food & Drinks',       path: '/food',      icon: Coffee },
         { name: 'Financial Analytics', path: '/analytics', icon: LineChart },
     ];
@@ -58,6 +76,9 @@ export default function Layout() {
                             >
                                 <Icon size={20} className="nav-icon" />
                                 <span>{item.name}</span>
+                                {item.badge > 0 && (
+                                    <span className="nav-badge">{item.badge > 99 ? '99+' : item.badge}</span>
+                                )}
                                 {isActive && <div className="active-indicator" />}
                             </NavLink>
                         );

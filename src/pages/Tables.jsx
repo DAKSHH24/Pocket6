@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Square, Plus, Minus, Clock, X, Utensils, Bell, AlertTriangle, Trash2 } from 'lucide-react';
+import { Play, Square, Plus, Minus, Clock, X, Utensils, Bell, AlertTriangle, Trash2, ShoppingBag, User } from 'lucide-react';
 import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, writeBatch, deleteDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -20,10 +20,19 @@ export default function Tables() {
 
     // Checkout State
     const [showCheckoutFor, setShowCheckoutFor] = useState(null);
+    // Due flow: 'checkout' | 'name_input'
+    const [checkoutStep, setCheckoutStep] = useState('checkout');
+    const [dueName, setDueName] = useState('');
     const [showAlerts, setShowAlerts] = useState(false);
     const alertBtnRef = useRef(null);
     const alertDropRef = useRef(null);
     const [addTableError, setAddTableError] = useState('');
+
+    // Walk-in Order State
+    const [showWalkIn, setShowWalkIn] = useState(false);
+    const [walkInName, setWalkInName] = useState('');
+    const [walkInOrders, setWalkInOrders] = useState([]); // [{...item, qty}]
+    const [walkInTab, setWalkInTab] = useState('Snacks');
 
     // PS Player Count Modal
     const [showPsStartModal, setShowPsStartModal] = useState(null); // table object
@@ -47,7 +56,7 @@ export default function Tables() {
     useEffect(() => {
         if (!clubId) return;
         let cancelled = false;
-        const COLLECTIONS = ['tables', 'inventory', 'session_history', 'expenses'];
+        const COLLECTIONS = ['tables', 'inventory', 'session_history', 'expenses', 'bills'];
 
         async function migrateUntaggedDocs() {
             for (const colName of COLLECTIONS) {
@@ -99,14 +108,14 @@ export default function Tables() {
 
     // Lock body scroll when any modal is open so background doesn't shift
     useEffect(() => {
-        const anyOpen = showAddModal || showCanteenFor || showCheckoutFor;
+        const anyOpen = showAddModal || showCanteenFor || showCheckoutFor || showWalkIn;
         if (anyOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = '';
         }
         return () => { document.body.style.overflow = ''; };
-    }, [showAddModal, showCanteenFor, showCheckoutFor]);
+    }, [showAddModal, showCanteenFor, showCheckoutFor, showWalkIn]);
 
     // Fetch only THIS club's tables
     useEffect(() => {
@@ -178,6 +187,8 @@ export default function Tables() {
 
     const handleOpenCheckout = (table) => {
         setShowCheckoutFor(table);
+        setCheckoutStep('checkout');
+        setDueName('');
     };
 
     const MIN_PLAY_COST = 50; // Minimum billing for playing time
@@ -206,9 +217,9 @@ export default function Tables() {
             orders: tableInfo.orders || [],
             durationMins: parseFloat(minsElapsed.toFixed(1)),
             activeControllers: tableInfo.activeControllers || null,
+            paymentStatus: 'paid',
             createdAt: Date.now()
         };
-
 
         try {
             await addDoc(collection(db, 'session_history'), historyItem);
@@ -224,6 +235,148 @@ export default function Tables() {
             setShowCheckoutFor(null);
         } catch (error) {
             console.error("Error finalizing checkout:", error);
+        }
+    };
+
+    // Mark session as due — saves a bill and frees the table
+    const finalizeCheckoutDue = async (name) => {
+        if (!showCheckoutFor || !name.trim()) return;
+        const tableInfo = showCheckoutFor;
+        const elapsedMs = Math.max(0, currentTime - tableInfo.startTime);
+        const cappedMs = Math.min(elapsedMs, 60 * 60000);
+        const minsElapsed = cappedMs / 60000;
+        const rawPlayedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
+        const playedCost = Math.max(rawPlayedCost, MIN_PLAY_COST);
+        const foodCost = (tableInfo.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
+        const totalAmount = playedCost + foodCost;
+        const dateStr = new Date().toLocaleString();
+
+        try {
+            // Save to session_history with paymentStatus: 'due'
+            await addDoc(collection(db, 'session_history'), {
+                clubId,
+                tableName: tableInfo.name,
+                type: tableInfo.type,
+                playedCost,
+                foodCost,
+                totalCost: totalAmount,
+                date: dateStr,
+                orders: tableInfo.orders || [],
+                durationMins: parseFloat(minsElapsed.toFixed(1)),
+                activeControllers: tableInfo.activeControllers || null,
+                paymentStatus: 'due',
+                personName: name.trim(),
+                createdAt: Date.now()
+            });
+
+            // Save to bills collection
+            await addDoc(collection(db, 'bills'), {
+                clubId,
+                personName: name.trim(),
+                type: 'session',
+                tableName: tableInfo.name,
+                playedCost,
+                foodCost,
+                totalAmount,
+                orders: tableInfo.orders || [],
+                status: 'due',
+                date: dateStr,
+                paidAt: null,
+                paidAtDate: null,
+                createdAt: Date.now()
+            });
+
+            // Free the table
+            await updateDoc(doc(db, 'tables', tableInfo.id), {
+                status: 'free',
+                startTime: null,
+                customer: '',
+                note: '',
+                pausedTime: 0,
+                orders: []
+            });
+
+            setShowCheckoutFor(null);
+            setDueName('');
+            setCheckoutStep('checkout');
+        } catch (error) {
+            console.error('Error finalizing due checkout:', error);
+        }
+    };
+
+    // Walk-in canteen order helpers
+    const addWalkInItem = (item) => {
+        setWalkInOrders(prev => {
+            const existing = prev.find(o => o.id === item.id);
+            if (existing) return prev.map(o => o.id === item.id ? { ...o, qty: o.qty + 1 } : o);
+            return [...prev, { ...item, qty: 1 }];
+        });
+    };
+
+    const removeWalkInItem = (item) => {
+        setWalkInOrders(prev => {
+            const existing = prev.find(o => o.id === item.id);
+            if (!existing) return prev;
+            if (existing.qty <= 1) return prev.filter(o => o.id !== item.id);
+            return prev.map(o => o.id === item.id ? { ...o, qty: o.qty - 1 } : o);
+        });
+    };
+
+    const finalizeWalkIn = async (paymentStatus) => {
+        if (!walkInName.trim() || walkInOrders.length === 0) return;
+        const foodCost = walkInOrders.reduce((s, o) => s + o.price * o.qty, 0);
+        const dateStr = new Date().toLocaleString();
+
+        try {
+            // Deduct stock
+            const batch = writeBatch(db);
+            walkInOrders.forEach(o => {
+                batch.update(doc(db, 'inventory', String(o.id)), {
+                    stock: Math.max(0, o.stock - o.qty)
+                });
+            });
+            await batch.commit();
+
+            if (paymentStatus === 'due') {
+                await addDoc(collection(db, 'bills'), {
+                    clubId,
+                    personName: walkInName.trim(),
+                    type: 'canteen_only',
+                    tableName: null,
+                    playedCost: 0,
+                    foodCost,
+                    totalAmount: foodCost,
+                    orders: walkInOrders,
+                    status: 'due',
+                    date: dateStr,
+                    paidAt: null,
+                    paidAtDate: null,
+                    createdAt: Date.now()
+                });
+            }
+            // If paid, just stock deduction is enough (no bill doc needed)
+            // Optionally save to session_history for analytics
+            await addDoc(collection(db, 'session_history'), {
+                clubId,
+                tableName: 'Walk-in',
+                type: 'Walk-in',
+                playedCost: 0,
+                foodCost,
+                totalCost: foodCost,
+                date: dateStr,
+                orders: walkInOrders,
+                durationMins: 0,
+                paymentStatus,
+                personName: walkInName.trim(),
+                createdAt: Date.now()
+            });
+
+            setShowWalkIn(false);
+            setWalkInName('');
+            setWalkInOrders([]);
+            setWalkInTab('Snacks');
+        } catch (err) {
+            console.error('Error finalizing walk-in order:', err);
         }
     };
 
@@ -414,6 +567,13 @@ export default function Tables() {
                             </div>
                         );
                     })()}
+                    <button
+                        className="walkin-btn"
+                        onClick={() => { setShowWalkIn(true); setWalkInName(''); setWalkInOrders([]); }}
+                        title="Walk-in canteen order (no table)"
+                    >
+                        <ShoppingBag size={16} /> Walk-in Order
+                    </button>
                     <button className="primary-button" onClick={() => setShowAddModal(true)}>+ Add New Table</button>
                 </div>
             </div>
@@ -748,10 +908,156 @@ export default function Tables() {
                                 </div>
                             </div>
 
-                            <div className="modal-action-row">
-                                <button className="glass-button modal-action-btn" onClick={() => setShowCheckoutFor(null)}>Cancel</button>
-                                <button className="primary-button modal-action-btn" style={{ background: '#10b981', color: 'white' }} onClick={finalizeCheckout}>
-                                    Done
+                            {checkoutStep === 'checkout' && (
+                                <div className="checkout-action-row">
+                                    <button
+                                        className="glass-button modal-action-btn"
+                                        onClick={() => setShowCheckoutFor(null)}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        className="modal-action-btn checkout-due-btn"
+                                        onClick={() => setCheckoutStep('name_input')}
+                                    >
+                                        ⏳ Due
+                                    </button>
+                                    <button
+                                        className="modal-action-btn checkout-paid-btn"
+                                        onClick={finalizeCheckout}
+                                    >
+                                        ✓ Paid
+                                    </button>
+                                </div>
+                            )}
+
+                            {checkoutStep === 'name_input' && (
+                                <div className="checkout-due-step">
+                                    <div className="due-step-title">
+                                        <User size={18} /> Who is leaving without paying?
+                                    </div>
+                                    <input
+                                        type="text"
+                                        className="glass-input"
+                                        placeholder="Enter customer name…"
+                                        value={dueName}
+                                        onChange={e => setDueName(e.target.value)}
+                                        autoFocus
+                                        onKeyDown={e => e.key === 'Enter' && dueName.trim() && finalizeCheckoutDue(dueName)}
+                                    />
+                                    <div className="checkout-action-row" style={{ marginTop: '0.75rem' }}>
+                                        <button
+                                            className="glass-button modal-action-btn"
+                                            onClick={() => setCheckoutStep('checkout')}
+                                        >
+                                            ← Back
+                                        </button>
+                                        <button
+                                            className="modal-action-btn checkout-due-btn"
+                                            onClick={() => finalizeCheckoutDue(dueName)}
+                                            disabled={!dueName.trim()}
+                                        >
+                                            Confirm Due
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })(), document.body)}
+
+            {/* WALK-IN ORDER MODAL */}
+            {showWalkIn && createPortal((() => {
+                const drinksF = (i) => i.category === 'Drinks';
+                const tobaccoF = (i) => i.category === 'Tobacco/Lounge';
+                const snacksF = (i) => i.category !== 'Drinks' && i.category !== 'Tobacco/Lounge';
+                const filtWalkIn = [...inventory]
+                    .filter(walkInTab === 'Drinks' ? drinksF : walkInTab === 'Tobacco' ? tobaccoF : snacksF)
+                    .sort((a, b) => a.name.localeCompare(b.name));
+                const walkInTotal = walkInOrders.reduce((s, o) => s + o.price * o.qty, 0);
+                return (
+                    <div className="overlay" onClick={() => setShowWalkIn(false)}>
+                        <div className="modal modal-relative" onClick={e => e.stopPropagation()}>
+                            <button className="modal-close-btn" onClick={() => setShowWalkIn(false)}>
+                                <X size={18} />
+                            </button>
+                            <div className="modal-header-block">
+                                <h3 className="text-xl font-bold">Walk-in Order</h3>
+                                <span className="text-sm font-normal text-muted">Customer not playing — just ordering food/drinks</span>
+                            </div>
+
+                            {/* Customer Name */}
+                            <div className="walkin-name-row">
+                                <User size={16} className="text-muted" />
+                                <input
+                                    type="text"
+                                    className="glass-input"
+                                    placeholder="Customer name (optional for Due)…"
+                                    value={walkInName}
+                                    onChange={e => setWalkInName(e.target.value)}
+                                    style={{ flex: 1 }}
+                                />
+                            </div>
+
+                            {/* Category tabs */}
+                            <div className="canteen-seg-control">
+                                <button className={`seg-btn${walkInTab === 'Snacks' ? ' seg-active' : ''}`} onClick={() => setWalkInTab('Snacks')}>Snacks</button>
+                                <button className={`seg-btn${walkInTab === 'Drinks' ? ' seg-active' : ''}`} onClick={() => setWalkInTab('Drinks')}>Drinks</button>
+                                <button className={`seg-btn${walkInTab === 'Tobacco' ? ' seg-active' : ''}`} onClick={() => setWalkInTab('Tobacco')}>Tobacco</button>
+                            </div>
+
+                            {/* Items */}
+                            <div className="canteen-items-list">
+                                {filtWalkIn.length === 0 ? <p className="text-muted text-center p-4">No items in this category.</p> : null}
+                                {filtWalkIn.map(item => {
+                                    const orderItem = walkInOrders.find(o => o.id === item.id);
+                                    const qty = orderItem ? orderItem.qty : 0;
+                                    return (
+                                        <div key={item.id} className="canteen-modal-item glass-panel">
+                                            <div className="cmi-info">
+                                                <div className="font-bold">{item.name}</div>
+                                                <div className="text-glow-green text-sm">₹{item.price.toFixed(2)}</div>
+                                            </div>
+                                            <div className="cmi-controls">
+                                                <button className="qty-btn" onClick={() => removeWalkInItem(item)} disabled={qty === 0}>
+                                                    <Minus size={16} color="#000" strokeWidth={3} />
+                                                </button>
+                                                <span className="qty-display">{qty}</span>
+                                                <button className="qty-btn" onClick={() => addWalkInItem(item)} disabled={item.stock <= 0}>
+                                                    <Plus size={16} color="#000" strokeWidth={3} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Total */}
+                            {walkInOrders.length > 0 && (
+                                <div className="walkin-total-row">
+                                    <span className="text-muted">Total</span>
+                                    <span className="walkin-total-val">₹{walkInTotal.toFixed(2)}</span>
+                                </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="checkout-action-row">
+                                <button className="glass-button modal-action-btn" onClick={() => setShowWalkIn(false)}>Cancel</button>
+                                <button
+                                    className="modal-action-btn checkout-due-btn"
+                                    onClick={() => finalizeWalkIn('due')}
+                                    disabled={walkInOrders.length === 0 || !walkInName.trim()}
+                                    title={!walkInName.trim() ? 'Enter customer name for Due' : ''}
+                                >
+                                    ⏳ Due
+                                </button>
+                                <button
+                                    className="modal-action-btn checkout-paid-btn"
+                                    onClick={() => finalizeWalkIn('paid')}
+                                    disabled={walkInOrders.length === 0}
+                                >
+                                    ✓ Paid
                                 </button>
                             </div>
                         </div>
