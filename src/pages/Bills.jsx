@@ -55,14 +55,19 @@ export default function Bills() {
         }
     };
 
-    const filtered = bills.filter(b => {
-        if (activeTab === 'all') return true;
-        return b.type === activeTab;
-    });
+    // Only show unpaid bills — paid ones are visible in Financial Analytics only
+    const filtered = bills
+        .filter(b => b.status === 'due')
+        .filter(b => {
+            if (activeTab === 'all') return true;
+            return b.type === activeTab;
+        });
 
     const dueBills = bills.filter(b => b.status === 'due');
     const totalDue = dueBills.reduce((s, b) => s + (b.totalAmount || 0), 0);
-    const paidBills = bills.filter(b => b.status === 'paid');
+    const paidToday = bills
+        .filter(b => b.status === 'paid' && b.paidAt && new Date(b.paidAt).toDateString() === new Date().toDateString())
+        .reduce((s, b) => s + (b.totalAmount || 0), 0);
 
     const formatDate = (dateStr) => dateStr || '—';
 
@@ -89,16 +94,8 @@ export default function Bills() {
                     <div className="bsc-icon"><CheckCircle2 size={22} /></div>
                     <div className="bsc-info">
                         <div className="bsc-label">Recovered Today</div>
-                        <div className="bsc-value">
-                            ₹{paidBills
-                                .filter(b => {
-                                    const today = new Date().toDateString();
-                                    return b.paidAt && new Date(b.paidAt).toDateString() === today;
-                                })
-                                .reduce((s, b) => s + (b.totalAmount || 0), 0)
-                                .toFixed(2)}
-                        </div>
-                        <div className="bsc-count">{paidBills.length} cleared total</div>
+                        <div className="bsc-value">₹{paidToday.toFixed(2)}</div>
+                        <div className="bsc-count">cleared today — see Analytics for history</div>
                     </div>
                 </div>
             </div>
@@ -109,8 +106,8 @@ export default function Bills() {
                     className={`bills-tab-btn${activeTab === 'all' ? ' active' : ''}`}
                     onClick={() => setActiveTab('all')}
                 >
-                    All Bills
-                    {bills.length > 0 && <span className="bills-tab-badge">{bills.length}</span>}
+                    All Dues
+                    {dueBills.length > 0 && <span className="bills-tab-badge">{dueBills.length}</span>}
                 </button>
                 <button
                     className={`bills-tab-btn${activeTab === 'session' ? ' active' : ''}`}
@@ -143,8 +140,8 @@ export default function Bills() {
                     <div className="bills-empty-title">No bills here</div>
                     <div className="bills-empty-sub">
                         {activeTab === 'all'
-                            ? 'All dues will appear here when sessions or walk-in orders are marked as unpaid.'
-                            : 'No bills in this category.'}
+                            ? 'All outstanding dues appear here. Once paid, they move to Financial Analytics.'
+                            : 'No unpaid bills in this category.'}
                     </div>
                 </div>
             ) : (

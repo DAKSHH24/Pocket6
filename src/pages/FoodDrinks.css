@@ -1,4 +1,99 @@
+/* ─── Pin Screen (mirrors Analytics.css) ─── */
+.inventory-container.pin-screen {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.inventory-container.pin-screen .pin-card {
+    width: 100%;
+    max-width: 400px;
+    padding: 2.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+}
+
+.pin-icon-wrap {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.25rem;
+}
+
+.pin-subtitle {
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.pin-form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.pin-input {
+    font-size: 1.75rem;
+    letter-spacing: 0.3em;
+    text-align: center;
+    padding: 1rem;
+}
+
+.pin-submit-btn {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    margin-top: 0.5rem;
+}
+
+.pin-back-link {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-family: var(--font-body);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    justify-content: center;
+    padding: 0.25rem;
+    transition: color 0.15s;
+}
+
+.pin-back-link:hover { color: var(--accent-primary); }
+
+.pin-msg {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    padding: 0.55rem 0.8rem;
+    border-radius: 8px;
+}
+
+.pin-msg-err {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.2);
+    color: #f87171;
+}
+
+.pin-msg-ok {
+    background: rgba(16,185,129,0.1);
+    border: 1px solid rgba(16,185,129,0.2);
+    color: #34d399;
+}
+
 .inventory-container {
+
     display: flex;
     flex-direction: column;
 }
@@ -124,3 +219,61 @@
 .opacity-50 {
     opacity: 0.5;
 }
+
+/* ── Stock Lock Button ── */
+.stock-lock-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 10px;
+    color: #f59e0b;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.18s, transform 0.15s;
+}
+
+.stock-lock-btn:hover {
+    background: rgba(245, 158, 11, 0.18);
+    transform: scale(1.02);
+}
+
+.stock-lock-btn.unlocked {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+}
+
+.stock-lock-btn.unlocked:hover {
+    background: rgba(16, 185, 129, 0.18);
+}
+
+/* ── Locked Stock Display ── */
+.inv-stock-locked {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+}
+
+.inv-stock-locked:hover {
+    background: rgba(245, 158, 11, 0.07);
+    border-color: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.inv-stock-locked.inv-stock-low {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+}

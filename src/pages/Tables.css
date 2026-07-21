@@ -164,23 +164,73 @@
     margin-top: 0.25rem;
 }
 
-.tc-delete-btn-top {
-    background: rgba(239, 68, 68, 0.08);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    color: #ef4444;
+/* ── 3-Dot Menu ── */
+.tc-three-dot-wrap {
+    position: relative;
+}
+
+.tc-three-dot-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
     cursor: pointer;
-    padding: 0.35rem;
-    border-radius: 50%;
+    padding: 0.55rem 0.55rem;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.18s, border-color 0.18s, transform 0.18s;
+    transition: background 0.18s, color 0.18s;
 }
 
-.tc-delete-btn-top:hover {
-    background: rgba(239, 68, 68, 0.18);
-    border-color: rgba(239, 68, 68, 0.5);
-    transform: scale(1.1);
+.tc-three-dot-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.tc-dot-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 140px;
+    padding: 0.35rem;
+    z-index: 200;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    animation: fade-in-down 0.15s ease;
+}
+
+@keyframes fade-in-down {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.tc-dot-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-align: left;
+    color: var(--text-secondary);
+}
+
+.tc-dot-item:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+.tc-dot-danger {
+    color: #ef4444;
+}
+
+.tc-dot-danger:hover {
+    background: rgba(239, 68, 68, 0.1) !important;
 }
 
 .tc-main-status {
@@ -1136,10 +1186,10 @@ select.glass-input {
     align-items: center;
     gap: 0.45rem;
     padding: 0.55rem 1.1rem;
-    background: rgba(56, 189, 248, 0.12);
-    border: 1px solid rgba(56, 189, 248, 0.3);
+    background: rgba(16, 185, 129, 0.8);
+    border: 1px solid rgba(16, 185, 129, 0.9);
     border-radius: 10px;
-    color: #38bdf8;
+    color: #ffffff;
     font-weight: 600;
     font-size: 0.875rem;
     cursor: pointer;
@@ -1147,7 +1197,7 @@ select.glass-input {
 }
 
 .walkin-btn:hover {
-    background: rgba(56, 189, 248, 0.22);
+    background: rgba(16, 185, 129, 0.95);
     transform: scale(1.02);
 }
 
@@ -1177,4 +1227,30 @@ select.glass-input {
     font-weight: 800;
     font-family: var(--font-heading);
     color: #10b981;
-}
+}
+
+/* ── Small Modal ── */
+.modal-sm {
+    max-width: 420px !important;
+}
+
+/* ── PS Player Count Buttons ── */
+.ps-player-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 1rem;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.18s, transform 0.15s;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.ps-player-btn:hover {
+    background: rgba(16, 185, 129, 0.1) !important;
+    border-color: rgba(16, 185, 129, 0.3);
+    transform: scale(1.03);
+}
+

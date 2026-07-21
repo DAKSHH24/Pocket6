@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Square, Plus, Minus, Clock, X, Utensils, Bell, AlertTriangle, Trash2, ShoppingBag, User } from 'lucide-react';
+import { Play, Square, Plus, Minus, Clock, X, Utensils, Bell, AlertTriangle, Trash2, ShoppingBag, User, MoreVertical } from 'lucide-react';
 import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, writeBatch, deleteDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +37,20 @@ export default function Tables() {
     // PS Player Count Modal
     const [showPsStartModal, setShowPsStartModal] = useState(null); // table object
 
+    // ── New: shared header 3-dot menu (table deletion) ──
+    const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+    const headerMenuRef = useRef(null);
+    const [deleteConfirmFor, setDeleteConfirmFor] = useState(null); // { id, name }
+
+    // ── New: Custom Start Time modal ──
+    // 'none' | table object waiting for start mode choice
+    const [showStartModal, setShowStartModal] = useState(null);
+    const [customStartTime, setCustomStartTime] = useState(''); // HH:MM string (24hr, for internal use)
+    const [startHour, setStartHour] = useState('12');
+    const [startMinute, setStartMinute] = useState('00');
+    const [startAmPm, setStartAmPm] = useState('AM');
+    const [startTimeError, setStartTimeError] = useState('');
+
     // New Table Form
     const [newTableType, setNewTableType] = useState('Snooker');
     const [customType, setCustomType] = useState('');
@@ -49,10 +63,6 @@ export default function Tables() {
     const [searchQuery, setSearchQuery] = useState('');
 
     // ── One-time migration ──────────────────────────────────────────────────
-    // Existing Firestore docs were created before multi-tenancy was added and
-    // have no clubId field. This effect runs once per login, finds every doc
-    // across all 4 collections that is missing clubId, and stamps them in a
-    // batch update. Safe to re-run — it only touches untagged documents.
     useEffect(() => {
         if (!clubId) return;
         let cancelled = false;
@@ -64,8 +74,6 @@ export default function Tables() {
                     const snap = await getDocs(collection(db, colName));
                     const untagged = snap.docs.filter(d => !d.data().clubId);
                     if (untagged.length === 0 || cancelled) continue;
-
-                    // Batch in groups of 500 (Firestore limit)
                     for (let i = 0; i < untagged.length; i += 500) {
                         const batch = writeBatch(db);
                         untagged.slice(i, i + 500).forEach(d =>
@@ -79,19 +87,18 @@ export default function Tables() {
                 }
             }
         }
-
         migrateUntaggedDocs();
         return () => { cancelled = true; };
-    }, [clubId]); // runs once per session
+    }, [clubId]);
     // ───────────────────────────────────────────────────────────────────────
 
-    // 1-second clock tick (drives live elapsed time display)
+    // 1-second clock tick
     useEffect(() => {
         const timerId = setInterval(() => setCurrentTime(Date.now()), 1000);
         return () => clearInterval(timerId);
     }, []);
 
-    // Close inventory alert dropdown when clicking anywhere outside
+    // Close alert dropdown on outside click
     useEffect(() => {
         if (!showAlerts) return;
         function handleOutsideClick(e) {
@@ -106,18 +113,27 @@ export default function Tables() {
         return () => document.removeEventListener('mousedown', handleOutsideClick);
     }, [showAlerts]);
 
-    // Lock body scroll when any modal is open so background doesn't shift
+    // Close header 3-dot menu on outside click
     useEffect(() => {
-        const anyOpen = showAddModal || showCanteenFor || showCheckoutFor || showWalkIn;
-        if (anyOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
+        if (!showHeaderMenu) return;
+        function handleOutside(e) {
+            if (headerMenuRef.current && !headerMenuRef.current.contains(e.target)) {
+                setShowHeaderMenu(false);
+            }
         }
-        return () => { document.body.style.overflow = ''; };
-    }, [showAddModal, showCanteenFor, showCheckoutFor, showWalkIn]);
+        document.addEventListener('mousedown', handleOutside);
+        return () => document.removeEventListener('mousedown', handleOutside);
+    }, [showHeaderMenu]);
 
-    // Fetch only THIS club's tables
+    // Lock body scroll when any modal is open
+    useEffect(() => {
+        const anyOpen = showAddModal || showCanteenFor || showCheckoutFor || showWalkIn
+            || showStartModal || deleteConfirmFor || showPsStartModal;
+        document.body.style.overflow = anyOpen ? 'hidden' : '';
+        return () => { document.body.style.overflow = ''; };
+    }, [showAddModal, showCanteenFor, showCheckoutFor, showWalkIn, showStartModal, deleteConfirmFor, showPsStartModal]);
+
+    // Fetch this club's tables
     useEffect(() => {
         if (!clubId) return;
         const q = query(collection(db, 'tables'), where('clubId', '==', clubId));
@@ -131,7 +147,7 @@ export default function Tables() {
         return () => unsubscribe();
     }, [clubId]);
 
-    // Fetch only THIS club's inventory
+    // Fetch this club's inventory
     useEffect(() => {
         if (!clubId) return;
         const q = query(collection(db, 'inventory'), where('clubId', '==', clubId));
@@ -145,44 +161,92 @@ export default function Tables() {
         return () => unsubscribe();
     }, [clubId]);
 
-    const handleStart = async (id) => {
+    // ── Start session helpers ──
+    // Called when Start Session button is clicked — shows choice modal (non-PS)
+    const handleStartClick = (table) => {
+        const defaultTime = new Date();
+        const rawHours = defaultTime.getHours();
+        const mins = String(defaultTime.getMinutes()).padStart(2, '0');
+        const ampm = rawHours >= 12 ? 'PM' : 'AM';
+        const h12 = rawHours % 12 || 12;
+        setStartHour(String(h12));
+        setStartMinute(mins);
+        setStartAmPm(ampm);
+        // also keep 24hr string for internal commit
+        setCustomStartTime(`${String(rawHours).padStart(2,'0')}:${mins}`);
+        setStartTimeError('');
+        setShowStartModal(table);
+    };
+
+    // Commit a start with a given timestamp
+    const commitStart = async (table, startTs) => {
         try {
-            await updateDoc(doc(db, 'tables', id), {
+            await updateDoc(doc(db, 'tables', table.id), {
                 status: 'occupied',
-                startTime: Date.now(),
+                startTime: startTs,
                 pausedTime: 0,
                 orders: []
             });
+            setShowStartModal(null);
         } catch (error) {
-            console.error("Error starting table:", error);
+            console.error('Error starting table:', error);
         }
     };
 
-    // PS-specific start: pick player count first
-    const handlePsStartConfirm = async (table, playerCount) => {
+    // "Start Now"
+    const handleStartNow = () => {
+        if (!showStartModal) return;
+        commitStart(showStartModal, Date.now());
+    };
+
+    // "Custom Time" — parse the 12hr inputs and apply today's date
+    const handleStartCustomTime = () => {
+        if (!showStartModal) return;
+        const h = parseInt(startHour, 10);
+        const m = parseInt(startMinute, 10);
+        if (isNaN(h) || isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) {
+            setStartTimeError('Invalid time. Use 1–12 for hour and 00–59 for minutes.');
+            return;
+        }
+        let hours24 = h % 12;
+        if (startAmPm === 'PM') hours24 += 12;
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours24, m, 0, 0);
+        if (start.getTime() > Date.now()) {
+            setStartTimeError('Start time cannot be in the future.');
+            return;
+        }
+        commitStart(showStartModal, start.getTime());
+    };
+
+    // PS-specific start: still shows choice modal first, then picks players
+    const handlePsStartConfirm = async (table, playerCount, startTs) => {
         const rate = table.controllerRates?.[playerCount] ?? table.rate;
         try {
             await updateDoc(doc(db, 'tables', table.id), {
                 status: 'occupied',
-                startTime: Date.now(),
+                startTime: startTs,
                 pausedTime: 0,
                 orders: [],
                 activeControllers: parseInt(playerCount),
                 rate
             });
             setShowPsStartModal(null);
+            setShowStartModal(null);
         } catch (error) {
-            console.error("Error starting PS table:", error);
+            console.error('Error starting PS table:', error);
         }
     };
 
-    const handleDeleteTable = async (tableId, tableName) => {
-        if (!window.confirm(`Are you sure you want to delete "${tableName}"? This action cannot be undone.`)) return;
+    // ── In-app delete confirmation ──
+    const handleDeleteTable = async () => {
+        if (!deleteConfirmFor) return;
         try {
-            await deleteDoc(doc(db, 'tables', tableId));
+            await deleteDoc(doc(db, 'tables', deleteConfirmFor.id));
         } catch (error) {
             console.error('Error deleting table:', error);
         }
+        setDeleteConfirmFor(null);
     };
 
     const handleOpenCheckout = (table) => {
@@ -191,21 +255,18 @@ export default function Tables() {
         setDueName('');
     };
 
-    const MIN_PLAY_COST = 50; // Minimum billing for playing time
+    const MIN_PLAY_COST = 50;
 
     const finalizeCheckout = async () => {
         if (!showCheckoutFor) return;
         const tableInfo = showCheckoutFor;
         const elapsedMs = Math.max(0, currentTime - tableInfo.startTime);
-        // Cap at 60 minutes
         const cappedMs = Math.min(elapsedMs, 60 * 60000);
         const minsElapsed = cappedMs / 60000;
         const rawPlayedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
-        // Enforce minimum ₹50 for playing time
         const playedCost = Math.max(rawPlayedCost, MIN_PLAY_COST);
         const foodCost = (tableInfo.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
 
-        // Save to history — scoped to this club
         const historyItem = {
             clubId,
             tableName: tableInfo.name,
@@ -223,7 +284,6 @@ export default function Tables() {
 
         try {
             await addDoc(collection(db, 'session_history'), historyItem);
-
             await updateDoc(doc(db, 'tables', tableInfo.id), {
                 status: 'free',
                 startTime: null,
@@ -234,11 +294,10 @@ export default function Tables() {
             });
             setShowCheckoutFor(null);
         } catch (error) {
-            console.error("Error finalizing checkout:", error);
+            console.error('Error finalizing checkout:', error);
         }
     };
 
-    // Mark session as due — saves a bill and frees the table
     const finalizeCheckoutDue = async (name) => {
         if (!showCheckoutFor || !name.trim()) return;
         const tableInfo = showCheckoutFor;
@@ -252,7 +311,6 @@ export default function Tables() {
         const dateStr = new Date().toLocaleString();
 
         try {
-            // Save to session_history with paymentStatus: 'due'
             await addDoc(collection(db, 'session_history'), {
                 clubId,
                 tableName: tableInfo.name,
@@ -269,7 +327,6 @@ export default function Tables() {
                 createdAt: Date.now()
             });
 
-            // Save to bills collection
             await addDoc(collection(db, 'bills'), {
                 clubId,
                 personName: name.trim(),
@@ -286,7 +343,6 @@ export default function Tables() {
                 createdAt: Date.now()
             });
 
-            // Free the table
             await updateDoc(doc(db, 'tables', tableInfo.id), {
                 status: 'free',
                 startTime: null,
@@ -328,7 +384,6 @@ export default function Tables() {
         const dateStr = new Date().toLocaleString();
 
         try {
-            // Deduct stock
             const batch = writeBatch(db);
             walkInOrders.forEach(o => {
                 batch.update(doc(db, 'inventory', String(o.id)), {
@@ -354,8 +409,7 @@ export default function Tables() {
                     createdAt: Date.now()
                 });
             }
-            // If paid, just stock deduction is enough (no bill doc needed)
-            // Optionally save to session_history for analytics
+
             await addDoc(collection(db, 'session_history'), {
                 clubId,
                 tableName: 'Walk-in',
@@ -386,7 +440,6 @@ export default function Tables() {
         const type = newTableType === 'Other' ? customType : newTableType;
 
         if (newTableType === 'Play Station') {
-            // At least one controller rate must be filled
             const hasAnyRate = Object.values(psRates).some(v => v !== '');
             if (!type || !newTableName || !hasAnyRate) {
                 setAddTableError('Please fill in the table name and at least one controller rate.');
@@ -394,7 +447,6 @@ export default function Tables() {
             }
 
             const newId = Date.now().toString();
-            // Convert hourly rates to per-minute
             const controllerRates = {};
             Object.entries(psRates).forEach(([controllers, hourlyRate]) => {
                 if (hourlyRate !== '') {
@@ -421,14 +473,13 @@ export default function Tables() {
                 setPsRates({ 1: '', 2: '', 3: '', 4: '' });
                 setShowAddModal(false);
             } catch (error) {
-                console.error("Error adding table:", error);
+                console.error('Error adding table:', error);
             }
         } else {
             if (!type || !newTableName || !newTableRate) {
                 setAddTableError('Please fill in all fields before creating the table.');
                 return;
             }
-            // Convert hourly rate to per-minute
             const ratePerMinute = parseFloat((parseFloat(newTableRate) / 60).toFixed(4));
             const newId = Date.now().toString();
             const newTable = {
@@ -450,7 +501,7 @@ export default function Tables() {
                 setCustomType('');
                 setShowAddModal(false);
             } catch (error) {
-                console.error("Error adding table:", error);
+                console.error('Error adding table:', error);
             }
         }
     };
@@ -473,7 +524,7 @@ export default function Tables() {
             batch.update(doc(db, 'inventory', String(menuItem.id)), { stock: Math.max(0, menuItem.stock - 1) });
             await batch.commit();
         } catch (error) {
-            console.error("Error adding food to table:", error);
+            console.error('Error adding food to table:', error);
         }
     };
 
@@ -497,17 +548,15 @@ export default function Tables() {
                 batch.update(doc(db, 'inventory', String(menuItem.id)), { stock: menuItem.stock + 1 });
                 await batch.commit();
             } catch (error) {
-                console.error("Error removing food from table:", error);
+                console.error('Error removing food from table:', error);
             }
         }
     };
 
-    // Convert to countdown limit (60 mins)
     const formatCountdown = (ms) => {
         const defaultTime = 60 * 60000;
         let remaining = defaultTime - ms;
-        if (remaining < 0) remaining = 0; // stop at 0
-
+        if (remaining < 0) remaining = 0;
         const totalSeconds = Math.floor(remaining / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const mins = Math.floor((totalSeconds % 3600) / 60);
@@ -525,11 +574,24 @@ export default function Tables() {
         : baseFiltered;
     const categories = ['All', ...new Set(tables.map(t => t.type))];
 
+    // ── Checkout receipt helpers ──
+    const getCheckoutCosts = (tableInfo) => {
+        if (!tableInfo) return { minsElapsed: 0, playedCost: 0, foodCost: 0, total: 0, minimumApplied: false };
+        const elapsedMs = Math.max(0, currentTime - tableInfo.startTime);
+        const cappedMs = Math.min(elapsedMs, 60 * 60000);
+        const minsElapsed = cappedMs / 60000;
+        const rawPlayedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
+        const minimumApplied = rawPlayedCost < MIN_PLAY_COST;
+        const playedCost = Math.max(rawPlayedCost, MIN_PLAY_COST);
+        const foodCost = (tableInfo.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
+        return { minsElapsed, playedCost, foodCost, total: playedCost + foodCost, minimumApplied };
+    };
+
     return (
         <div className="tables-container">
             <div className="page-header">
                 <div>
-                    <h2>Tables & Sessions</h2>
+                    <h2>Tables &amp; Sessions</h2>
                 </div>
                 <div className="header-actions">
                     {(() => {
@@ -574,7 +636,43 @@ export default function Tables() {
                     >
                         <ShoppingBag size={16} /> Walk-in Order
                     </button>
-                    <button className="primary-button" onClick={() => setShowAddModal(true)}>+ Add New Table</button>
+                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                        <button className="primary-button" onClick={() => setShowAddModal(true)}>+ Add New Table</button>
+                        {/* Shared ⋮ menu for table deletion — at extreme right */}
+                        {tables.some(t => t.status !== 'occupied') && (
+                            <div className="tc-three-dot-wrap" ref={headerMenuRef}>
+                                <button
+                                    className="tc-three-dot-btn"
+                                    onClick={() => setShowHeaderMenu(v => !v)}
+                                    title="Table options"
+                                >
+                                    <MoreVertical size={18} />
+                                </button>
+                                {showHeaderMenu && (
+                                    <div className="tc-dot-dropdown glass-panel" style={{ right: 0, minWidth: 200 }}>
+                                        <div style={{ padding: '0.4rem 0.75rem 0.25rem', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                                            Delete a Table
+                                        </div>
+                                        {tables
+                                            .filter(t => t.status !== 'occupied')
+                                            .sort((a, b) => a.name.localeCompare(b.name))
+                                            .map(t => (
+                                                <button
+                                                    key={t.id}
+                                                    className="tc-dot-item tc-dot-danger"
+                                                    onClick={() => {
+                                                        setShowHeaderMenu(false);
+                                                        setDeleteConfirmFor({ id: t.id, name: t.name });
+                                                    }}
+                                                >
+                                                    <Trash2 size={13} /> {t.name}
+                                                </button>
+                                            ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -631,10 +729,10 @@ export default function Tables() {
                 {filteredTables.map(table => {
                     const isOccupied = table.status === 'occupied';
                     const elapsedMs = isOccupied ? Math.max(0, currentTime - table.startTime) : 0;
-                    // Cap cost at 60 min — timer stops counting money after time is up
                     const cappedMs = Math.min(elapsedMs, 60 * 60000);
                     const timeCost = isOccupied ? (cappedMs / 60000 * table.rate).toFixed(2) : '0.00';
                     const foodCost = (table.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
+
 
                     return (
                         <div key={table.id} className={`table-card-v2 glass-panel ${isOccupied ? 'occupied' : 'free'}`}>
@@ -643,11 +741,6 @@ export default function Tables() {
                                     <h3>{table.name}</h3>
                                 </div>
                                 <div className="tc-right-icons">
-                                    {!isOccupied && (
-                                        <button className="tc-delete-btn-top" onClick={(e) => { e.stopPropagation(); handleDeleteTable(table.id, table.name); }} title="Delete Table">
-                                            <Trash2 size={15} />
-                                        </button>
-                                    )}
                                     <span className="tc-type-pill">{table.type}</span>
                                 </div>
                             </div>
@@ -693,7 +786,6 @@ export default function Tables() {
                                 Rate: ₹{table.rate.toFixed(2)}/min
                             </div>
 
-                            {/* Order display list — sorted alphabetically */}
                             {table.orders && table.orders.length > 0 && (
                                 <div className="canteen-orders-block">
                                     {[...table.orders]
@@ -720,9 +812,18 @@ export default function Tables() {
                                         className="tc-action-circle bg-green tooltip-container"
                                         onClick={() => {
                                             if (table.type === 'Play Station' && table.controllerRates) {
-                                                setShowPsStartModal(table);
+                                                // PS: show start modal first, then player count
+                                                const now = new Date();
+                                                const rawH = now.getHours();
+                                                const mins = String(now.getMinutes()).padStart(2, '0');
+                                                setStartHour(String(rawH % 12 || 12));
+                                                setStartMinute(mins);
+                                                setStartAmPm(rawH >= 12 ? 'PM' : 'AM');
+                                                setCustomStartTime(`${String(rawH).padStart(2,'0')}:${mins}`);
+                                                setStartTimeError('');
+                                                setShowStartModal(table);
                                             } else {
-                                                handleStart(table.id);
+                                                handleStartClick(table);
                                             }
                                         }}
                                         title="Start Session"
@@ -737,7 +838,187 @@ export default function Tables() {
                 })}
             </div>
 
-            {/* CANTEEN MODAL — portal so it's always viewport-centered */}
+            {/* ── IN-APP DELETE CONFIRMATION MODAL ── */}
+            {deleteConfirmFor && createPortal(
+                <div className="overlay" onClick={() => setDeleteConfirmFor(null)}>
+                    <div className="modal modal-relative modal-sm" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header-block" style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🗑️</div>
+                            <h3 className="text-xl font-bold text-glow-red">Delete Table?</h3>
+                            <p className="text-muted text-sm" style={{ marginTop: '0.5rem' }}>
+                                Are you sure you want to delete <strong style={{ color: 'var(--text-primary)' }}>"{deleteConfirmFor.name}"</strong>?
+                                <br />This action cannot be undone.
+                            </p>
+                        </div>
+                        <div className="checkout-action-row" style={{ paddingTop: '0.5rem' }}>
+                            <button className="glass-button modal-action-btn" onClick={() => setDeleteConfirmFor(null)}>
+                                Cancel
+                            </button>
+                            <button
+                                className="modal-action-btn"
+                                style={{ flex: 1, background: 'linear-gradient(135deg,#ef4444,#dc2626)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}
+                                onClick={handleDeleteTable}
+                            >
+                                <Trash2 size={15} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                                Yes, Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ── START SESSION MODAL (Now / Custom Time) ── */}
+            {showStartModal && !showPsStartModal && createPortal(
+                <div className="overlay" onClick={() => { setShowStartModal(null); setStartTimeError(''); }}>
+                    <div className="modal modal-relative modal-sm" onClick={e => e.stopPropagation()}>
+                        <button className="modal-close-btn" onClick={() => { setShowStartModal(null); setStartTimeError(''); }}><X size={18} /></button>
+                        <div className="modal-header-block">
+                            <div style={{ fontSize: '1.8rem', marginBottom: '0.4rem' }}>🕐</div>
+                            <h3 className="text-xl font-bold">Start Session</h3>
+                            <p className="text-muted text-sm">{showStartModal.name}</p>
+                        </div>
+
+                        {/* Start Now — green (TOP) */}
+                        <div style={{ padding: '0 1.5rem 1rem' }}>
+                            <button
+                                className="tc-action-circle bg-green"
+                                style={{ width: '100%', borderRadius: '10px', padding: '0.85rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', border: 'none', cursor: 'pointer', fontWeight: 700 }}
+                                onClick={() => {
+                                    if (showStartModal.type === 'Play Station' && showStartModal.controllerRates) {
+                                        setShowPsStartModal(showStartModal);
+                                    } else {
+                                        handleStartNow();
+                                    }
+                                }}
+                            >
+                                <Play size={18} fill="#fff" />
+                                Start Now
+                            </button>
+                        </div>
+
+                        {/* Divider */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0 1.5rem 0.85rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+                            or set custom start time
+                            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+                        </div>
+
+                        {/* Custom Time — 12hr with AM/PM (BOTTOM) */}
+                        <div style={{ padding: '0 1.5rem 1.5rem' }}>
+                            <label className="text-sm text-muted" style={{ display: 'block', marginBottom: '0.5rem' }}>
+                                When did the session actually start?
+                            </label>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                {/* Hour */}
+                                <input
+                                    type="number"
+                                    min="1" max="12"
+                                    className="glass-input"
+                                    style={{ width: '4rem', textAlign: 'center', padding: '0.65rem 0.4rem' }}
+                                    value={startHour}
+                                    onChange={e => { setStartHour(e.target.value); setStartTimeError(''); }}
+                                    placeholder="12"
+                                />
+                                <span style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '1.1rem' }}>:</span>
+                                {/* Minute */}
+                                <input
+                                    type="number"
+                                    min="0" max="59"
+                                    className="glass-input"
+                                    style={{ width: '4rem', textAlign: 'center', padding: '0.65rem 0.4rem' }}
+                                    value={startMinute}
+                                    onChange={e => { setStartMinute(e.target.value.padStart(2,'0')); setStartTimeError(''); }}
+                                    placeholder="00"
+                                />
+                                {/* AM / PM toggle */}
+                                <button
+                                    type="button"
+                                    onClick={() => setStartAmPm(p => p === 'AM' ? 'PM' : 'AM')}
+                                    style={{
+                                        padding: '0.65rem 0.9rem',
+                                        borderRadius: '10px',
+                                        border: '1px solid rgba(255,255,255,0.15)',
+                                        background: startAmPm === 'AM' ? 'rgba(59,130,246,0.18)' : 'rgba(239,68,68,0.15)',
+                                        color: startAmPm === 'AM' ? '#63b3ed' : '#f87171',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        fontSize: '0.9rem',
+                                        letterSpacing: '0.04em',
+                                        transition: 'all 0.18s'
+                                    }}
+                                >
+                                    {startAmPm}
+                                </button>
+                                {/* Set Time button — pure white bg, black text */}
+                                <button
+                                    type="button"
+                                    className="modal-action-btn"
+                                    style={{ flex: 1, padding: '0.65rem 0.8rem', background: '#ffffff', color: '#111111', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                    onClick={() => {
+                                        if (showStartModal.type === 'Play Station' && showStartModal.controllerRates) {
+                                            setStartTimeError('');
+                                            setShowPsStartModal(showStartModal);
+                                        } else {
+                                            handleStartCustomTime();
+                                        }
+                                    }}
+                                >
+                                    Set Time
+                                </button>
+                            </div>
+                            {startTimeError && (
+                                <div style={{ color: '#f87171', fontSize: '0.8rem', marginTop: '0.4rem' }}>⚠ {startTimeError}</div>
+                            )}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ── PS PLAYER COUNT MODAL ── */}
+            {showPsStartModal && createPortal(
+                <div className="overlay" onClick={() => { setShowPsStartModal(null); setShowStartModal(null); }}>
+                    <div className="modal modal-relative modal-sm" onClick={e => e.stopPropagation()}>
+                        <button className="modal-close-btn" onClick={() => { setShowPsStartModal(null); setShowStartModal(null); }}><X size={18} /></button>
+                        <div className="modal-header-block">
+                            <h3 className="text-xl font-bold">Controllers</h3>
+                            <p className="text-muted text-sm">How many players for {showPsStartModal.name}?</p>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', padding: '0 1.5rem 1.5rem' }}>
+                            {[1, 2, 3, 4].map(count => {
+                                const ratePerMin = showPsStartModal.controllerRates?.[count];
+                                if (!ratePerMin) return null;
+                                const hourlyRate = (ratePerMin * 60).toFixed(0);
+                                return (
+                                    <button
+                                        key={count}
+                                        className="ps-player-btn glass-panel"
+                                        onClick={() => {
+                                            // Determine start timestamp
+                                            let startTs = Date.now();
+                                            if (customStartTime && showStartModal) {
+                                                const [hh, mm] = customStartTime.split(':').map(Number);
+                                                const now = new Date();
+                                                const parsed = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0);
+                                                if (parsed.getTime() <= Date.now()) startTs = parsed.getTime();
+                                            }
+                                            handlePsStartConfirm(showPsStartModal, count, startTs);
+                                        }}
+                                    >
+                                        <div style={{ fontSize: '1.6rem' }}>🎮</div>
+                                        <div className="font-bold">{count} Player{count > 1 ? 's' : ''}</div>
+                                        <div className="text-sm text-muted">₹{hourlyRate}/hr</div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* CANTEEN MODAL */}
             {showCanteenFor && createPortal((() => {
                 const drinksFilter = (item) => item.category === 'Drinks';
                 const tobaccoFilter = (item) => item.category === 'Tobacco/Lounge';
@@ -759,7 +1040,6 @@ export default function Tables() {
                                 <h3 className="text-xl font-bold">Order to Table</h3>
                                 <span className="text-sm font-normal text-muted">Add Items directly to the selected table.</span>
                             </div>
-                            {/* Segmented control */}
                             <div className="canteen-seg-control">
                                 <button className={`seg-btn${canteenTab === 'Snacks' ? ' seg-active' : ''}`} onClick={() => setCanteenTab('Snacks')}>Snacks</button>
                                 <button className={`seg-btn${canteenTab === 'Drinks' ? ' seg-active' : ''}`} onClick={() => setCanteenTab('Drinks')}>Drinks</button>
@@ -801,8 +1081,7 @@ export default function Tables() {
                                     );
                                 })}
                             </div>
-                            <div className="modal-action-row">
-                                <button className="glass-button modal-action-btn" onClick={() => setShowCanteenFor(null)}>Cancel</button>
+                            <div className="modal-action-row" style={{ padding: '1rem 1.5rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                                 <button className="primary-button modal-action-btn" onClick={() => setShowCanteenFor(null)}>Done</button>
                             </div>
                         </div>
@@ -810,62 +1089,15 @@ export default function Tables() {
                 );
             })(), document.body)}
 
-            {/* PS PLAYER COUNT MODAL */}
-            {showPsStartModal && createPortal((() => {
-                const psTable = showPsStartModal;
-                const availableRates = psTable.controllerRates || {};
-                const availableCounts = Object.keys(availableRates).map(Number).sort((a,b) => a-b);
-                return (
-                    <div className="overlay" onClick={() => setShowPsStartModal(null)}>
-                        <div className="modal modal-relative ps-start-modal" onClick={e => e.stopPropagation()}>
-                            <button className="modal-close-btn" onClick={() => setShowPsStartModal(null)}>
-                                <X size={18} />
-                            </button>
-                            <div className="ps-start-header">
-                                <div className="ps-start-icon">🎮</div>
-                                <h3 className="text-xl font-bold">How many people are playing?</h3>
-                                <p className="text-muted text-sm">Select the number of players to apply the correct rate.</p>
-                            </div>
-                            <div className="ps-player-grid">
-                                {availableCounts.map(count => {
-                                    const hourlyRate = (availableRates[count] * 60).toFixed(0);
-                                    return (
-                                        <button
-                                            key={count}
-                                            className="ps-player-btn"
-                                            onClick={() => handlePsStartConfirm(psTable, count)}
-                                        >
-                                            <span className="ps-player-emoji">{count === 1 ? '👤' : count === 2 ? '👥' : '👥'}</span>
-                                            <span className="ps-player-count">{count} {count === 1 ? 'Player' : 'Players'}</span>
-                                            <span className="ps-player-rate">₹{hourlyRate}/hr</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-                );
-            })(), document.body)}
-
-            {/* CHECKOUT MODAL — portal */}
+            {/* CHECKOUT MODAL */}
             {showCheckoutFor && createPortal((() => {
                 const tableInfo = showCheckoutFor;
-                const elapsedMs = Math.max(0, currentTime - tableInfo.startTime);
-                const cappedMs = Math.min(elapsedMs, 60 * 60000);
-                const minsElapsed = cappedMs / 60000;
-                const rawPlayedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
-                const playedCost = Math.max(rawPlayedCost, 50);
-                const minimumApplied = rawPlayedCost < 50;
-                const foodCost = (tableInfo.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
-                const total = playedCost + foodCost;
+                const { minsElapsed, playedCost, foodCost, total, minimumApplied } = getCheckoutCosts(tableInfo);
 
                 return (
                     <div className="overlay" onClick={() => setShowCheckoutFor(null)}>
                         <div className="modal modal-relative" onClick={e => e.stopPropagation()}>
-                            <button className="modal-close-btn" onClick={() => setShowCheckoutFor(null)}>
-                                <X size={18} />
-                            </button>
-
+                            <button className="modal-close-btn" onClick={() => setShowCheckoutFor(null)}><X size={18} /></button>
                             <div className="checkout-header">
                                 <h3 className="text-2xl font-bold text-glow-red">Checkout Session</h3>
                                 <p className="text-muted text-sm">{tableInfo.name}</p>
@@ -934,28 +1166,23 @@ export default function Tables() {
                             {checkoutStep === 'name_input' && (
                                 <div className="checkout-due-step">
                                     <div className="due-step-title">
-                                        <User size={18} /> Who is leaving without paying?
+                                        <User size={16} /> Who is leaving without paying?
                                     </div>
                                     <input
-                                        type="text"
                                         className="glass-input"
-                                        placeholder="Enter customer name…"
+                                        placeholder="Enter customer name for Due"
                                         value={dueName}
                                         onChange={e => setDueName(e.target.value)}
                                         autoFocus
-                                        onKeyDown={e => e.key === 'Enter' && dueName.trim() && finalizeCheckoutDue(dueName)}
+                                        onKeyDown={e => { if (e.key === 'Enter' && dueName.trim()) finalizeCheckoutDue(dueName); }}
                                     />
-                                    <div className="checkout-action-row" style={{ marginTop: '0.75rem' }}>
-                                        <button
-                                            className="glass-button modal-action-btn"
-                                            onClick={() => setCheckoutStep('checkout')}
-                                        >
-                                            ← Back
-                                        </button>
+                                    <div style={{ display: 'flex', gap: '0.6rem' }}>
+                                        <button className="glass-button modal-action-btn" style={{ flex: 1 }} onClick={() => setCheckoutStep('checkout')}>← Back</button>
                                         <button
                                             className="modal-action-btn checkout-due-btn"
-                                            onClick={() => finalizeCheckoutDue(dueName)}
+                                            style={{ flex: 2 }}
                                             disabled={!dueName.trim()}
+                                            onClick={() => finalizeCheckoutDue(dueName)}
                                         >
                                             Confirm Due
                                         </button>
@@ -967,50 +1194,50 @@ export default function Tables() {
                 );
             })(), document.body)}
 
-            {/* WALK-IN ORDER MODAL */}
+            {/* WALK-IN MODAL */}
             {showWalkIn && createPortal((() => {
-                const drinksF = (i) => i.category === 'Drinks';
-                const tobaccoF = (i) => i.category === 'Tobacco/Lounge';
-                const snacksF = (i) => i.category !== 'Drinks' && i.category !== 'Tobacco/Lounge';
-                const filtWalkIn = [...inventory]
-                    .filter(walkInTab === 'Drinks' ? drinksF : walkInTab === 'Tobacco' ? tobaccoF : snacksF)
+                const drinksFilter = (item) => item.category === 'Drinks';
+                const tobaccoFilter = (item) => item.category === 'Tobacco/Lounge';
+                const snacksFilter = (item) => item.category !== 'Drinks' && item.category !== 'Tobacco/Lounge';
+                const filteredInv = [...inventory]
+                    .filter(
+                        walkInTab === 'Drinks' ? drinksFilter :
+                            walkInTab === 'Tobacco' ? tobaccoFilter :
+                                snacksFilter
+                    )
                     .sort((a, b) => a.name.localeCompare(b.name));
                 const walkInTotal = walkInOrders.reduce((s, o) => s + o.price * o.qty, 0);
                 return (
                     <div className="overlay" onClick={() => setShowWalkIn(false)}>
                         <div className="modal modal-relative" onClick={e => e.stopPropagation()}>
-                            <button className="modal-close-btn" onClick={() => setShowWalkIn(false)}>
-                                <X size={18} />
-                            </button>
+                            <button className="modal-close-btn" onClick={() => setShowWalkIn(false)}><X size={18} /></button>
                             <div className="modal-header-block">
                                 <h3 className="text-xl font-bold">Walk-in Order</h3>
-                                <span className="text-sm font-normal text-muted">Customer not playing — just ordering food/drinks</span>
+                                <p className="text-sm text-muted">Canteen order without a table</p>
                             </div>
 
-                            {/* Customer Name */}
-                            <div className="walkin-name-row">
-                                <User size={16} className="text-muted" />
-                                <input
-                                    type="text"
-                                    className="glass-input"
-                                    placeholder="Customer name (optional for Due)…"
-                                    value={walkInName}
-                                    onChange={e => setWalkInName(e.target.value)}
-                                    style={{ flex: 1 }}
-                                />
+                            <div style={{ padding: '0 1.5rem 0.75rem' }}>
+                                <div className="walkin-name-row">
+                                    <User size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                    <input
+                                        className="glass-input"
+                                        placeholder="Customer name (optional)"
+                                        value={walkInName}
+                                        onChange={e => setWalkInName(e.target.value)}
+                                        style={{ flex: 1 }}
+                                    />
+                                </div>
                             </div>
 
-                            {/* Category tabs */}
-                            <div className="canteen-seg-control">
+                            <div className="canteen-seg-control" style={{ margin: '0 1.5rem 0.5rem' }}>
                                 <button className={`seg-btn${walkInTab === 'Snacks' ? ' seg-active' : ''}`} onClick={() => setWalkInTab('Snacks')}>Snacks</button>
                                 <button className={`seg-btn${walkInTab === 'Drinks' ? ' seg-active' : ''}`} onClick={() => setWalkInTab('Drinks')}>Drinks</button>
                                 <button className={`seg-btn${walkInTab === 'Tobacco' ? ' seg-active' : ''}`} onClick={() => setWalkInTab('Tobacco')}>Tobacco</button>
                             </div>
 
-                            {/* Items */}
                             <div className="canteen-items-list">
-                                {filtWalkIn.length === 0 ? <p className="text-muted text-center p-4">No items in this category.</p> : null}
-                                {filtWalkIn.map(item => {
+                                {filteredInv.length === 0 ? <p className="text-muted text-center p-4">No items.</p> : null}
+                                {filteredInv.map(item => {
                                     const orderItem = walkInOrders.find(o => o.id === item.id);
                                     const qty = orderItem ? orderItem.qty : 0;
                                     return (
@@ -1020,42 +1247,37 @@ export default function Tables() {
                                                 <div className="text-glow-green text-sm">₹{item.price.toFixed(2)}</div>
                                             </div>
                                             <div className="cmi-controls">
-                                                <button className="qty-btn" onClick={() => removeWalkInItem(item)} disabled={qty === 0}>
-                                                    <Minus size={16} color="#000" strokeWidth={3} />
-                                                </button>
+                                                <button className="qty-btn" onClick={() => removeWalkInItem(item)} disabled={qty === 0}><Minus size={16} color="#000" strokeWidth={3} /></button>
                                                 <span className="qty-display">{qty}</span>
-                                                <button className="qty-btn" onClick={() => addWalkInItem(item)} disabled={item.stock <= 0}>
-                                                    <Plus size={16} color="#000" strokeWidth={3} />
-                                                </button>
+                                                <button className="qty-btn" onClick={() => addWalkInItem(item)} disabled={item.stock <= 0}><Plus size={16} color="#000" strokeWidth={3} /></button>
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
 
-                            {/* Total */}
                             {walkInOrders.length > 0 && (
-                                <div className="walkin-total-row">
-                                    <span className="text-muted">Total</span>
-                                    <span className="walkin-total-val">₹{walkInTotal.toFixed(2)}</span>
+                                <div style={{ padding: '0 1.5rem' }}>
+                                    <div className="walkin-total-row">
+                                        <span className="text-sm text-muted">Total</span>
+                                        <span className="walkin-total-val">₹{walkInTotal.toFixed(2)}</span>
+                                    </div>
                                 </div>
                             )}
 
-                            {/* Actions */}
                             <div className="checkout-action-row">
                                 <button className="glass-button modal-action-btn" onClick={() => setShowWalkIn(false)}>Cancel</button>
                                 <button
                                     className="modal-action-btn checkout-due-btn"
+                                    disabled={walkInOrders.length === 0}
                                     onClick={() => finalizeWalkIn('due')}
-                                    disabled={walkInOrders.length === 0 || !walkInName.trim()}
-                                    title={!walkInName.trim() ? 'Enter customer name for Due' : ''}
                                 >
                                     ⏳ Due
                                 </button>
                                 <button
                                     className="modal-action-btn checkout-paid-btn"
-                                    onClick={() => finalizeWalkIn('paid')}
                                     disabled={walkInOrders.length === 0}
+                                    onClick={() => finalizeWalkIn('paid')}
                                 >
                                     ✓ Paid
                                 </button>
@@ -1065,95 +1287,98 @@ export default function Tables() {
                 );
             })(), document.body)}
 
-            {/* ADD TABLE MODAL — portal */}
+            {/* ADD TABLE MODAL */}
             {showAddModal && createPortal(
                 <div className="overlay" onClick={() => setShowAddModal(false)}>
                     <div className="modal modal-relative" onClick={e => e.stopPropagation()}>
-                        <button className="modal-close-btn" onClick={() => setShowAddModal(false)}>
-                            <X size={18} />
-                        </button>
+                        <button className="modal-close-btn" onClick={() => setShowAddModal(false)}><X size={18} /></button>
                         <div className="modal-header-block">
-                            <h3 className="text-xl font-bold">Create New Table/Room</h3>
+                            <h3 className="text-xl font-bold">Add New Table</h3>
                         </div>
-
                         <form onSubmit={handleAddTable} className="flex-col gap-4" noValidate>
-                            <div className="form-group flex-col gap-2">
-                                <label className="text-sm text-muted">What type of table is it?</label>
+                            <div className="form-group">
+                                <label className="text-sm text-muted">Table Type</label>
                                 <select
                                     className="glass-input"
                                     value={newTableType}
-                                    onChange={(e) => setNewTableType(e.target.value)}
+                                    onChange={e => setNewTableType(e.target.value)}
                                 >
-                                    <option value="Snooker">Snooker Table</option>
-                                    <option value="Pool">Pool Table</option>
-                                    <option value="Play Station">Play Station</option>
-                                    <option value="Other">Other (Custom)</option>
+                                    <option>Snooker</option>
+                                    <option>Pool</option>
+                                    <option>Play Station</option>
+                                    <option>Other</option>
                                 </select>
-                                {newTableType === 'Other' && (
+                            </div>
+                            {newTableType === 'Other' && (
+                                <div className="form-group">
+                                    <label className="text-sm text-muted">Custom Type Name</label>
                                     <input
                                         type="text"
-                                        className="glass-input mt-2"
-                                        placeholder="Enter custom type..."
+                                        className="glass-input"
+                                        placeholder="e.g. Carrom, Chess…"
                                         value={customType}
                                         onChange={e => setCustomType(e.target.value)}
                                         required
                                     />
-                                )}
-                            </div>
-
-                            <div className="form-group flex-col gap-2">
+                                </div>
+                            )}
+                            <div className="form-group">
                                 <label className="text-sm text-muted">Table Name</label>
                                 <input
                                     type="text"
                                     className="glass-input"
-                                    placeholder="e.g. VIP Pool 1"
+                                    placeholder="e.g. Snooker 1"
                                     value={newTableName}
                                     onChange={e => setNewTableName(e.target.value)}
                                     required
+                                    autoFocus
                                 />
                             </div>
 
-                            {newTableType === 'Play Station' ? (
-                                <div className="form-group flex-col gap-2">
-                                    <label className="text-sm text-muted">Hourly Rate per Controller Count (₹/hr)</label>
-                                    <div className="ps-rates-grid">
+                            {newTableType !== 'Play Station' && (
+                                <div className="form-group">
+                                    <label className="text-sm text-muted">Hourly Rate (₹/hr)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        className="glass-input"
+                                        placeholder="e.g. 300"
+                                        value={newTableRate}
+                                        onChange={e => setNewTableRate(e.target.value)}
+                                        required
+                                    />
+                                    {newTableRate && !isNaN(parseFloat(newTableRate)) && (
+                                        <div className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
+                                            ₹{(parseFloat(newTableRate) / 60).toFixed(2)}/min
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {newTableType === 'Play Station' && (
+                                <div className="form-group">
+                                    <label className="text-sm text-muted">Controller Rates (₹/hr) — fill at least one</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginTop: '0.5rem' }}>
                                         {[1, 2, 3, 4].map(n => (
-                                            <div key={n} className="ps-rate-row">
-                                                <span className="ps-rate-label">🎮 {n} Controller{n > 1 ? 's' : ''}</span>
+                                            <div key={n}>
+                                                <label className="text-xs text-muted">{n} Controller{n > 1 ? 's' : ''}</label>
                                                 <input
-                                                    type="number"
-                                                    step="1"
-                                                    min="0"
-                                                    className="glass-input ps-rate-input"
-                                                    placeholder={`₹ / hr`}
+                                                    type="text"
+                                                    inputMode="decimal"
+                                                    className="glass-input"
+                                                    placeholder="₹/hr"
                                                     value={psRates[n]}
                                                     onChange={e => setPsRates(prev => ({ ...prev, [n]: e.target.value }))}
                                                 />
                                             </div>
                                         ))}
                                     </div>
-                                    <p className="ps-rate-hint">Rates will be automatically converted to per-minute billing.</p>
-                                </div>
-                            ) : (
-                                <div className="form-group flex-col gap-2">
-                                    <label className="text-sm text-muted">Rate Per Hour (₹)</label>
-                                    <input
-                                        type="number"
-                                        step="1"
-                                        min="0"
-                                        className="glass-input text-lg font-bold"
-                                        placeholder="150"
-                                        value={newTableRate}
-                                        onChange={e => setNewTableRate(e.target.value)}
-                                        required
-                                    />
-                                    <p className="ps-rate-hint">Will be billed at ₹{newTableRate ? (parseFloat(newTableRate) / 60).toFixed(2) : '0.00'}/min</p>
                                 </div>
                             )}
 
                             {addTableError && (
                                 <div style={{ color: '#f87171', fontSize: '0.82rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '0.5rem 0.8rem' }}>
-                                    {addTableError}
+                                    ⚠ {addTableError}
                                 </div>
                             )}
                             <div className="modal-action-row">
@@ -1162,8 +1387,9 @@ export default function Tables() {
                             </div>
                         </form>
                     </div>
-                </div>
-                , document.body)}
+                </div>,
+                document.body
+            )}
         </div>
     );
 }

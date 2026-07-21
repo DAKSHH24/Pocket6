@@ -71,7 +71,7 @@ body::before {
   background-position: center;
   background-repeat: no-repeat;
   /* Heavy dark overlay so content stays clean and readable */
-  filter: brightness(0.28) saturate(0.7);
+  filter: brightness(0.18) saturate(0.7);
 }
 
 /* Glassmorphism Utilities - More muted */
@@ -274,3 +274,8 @@ body::before {
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out forwards;
 }
+
+/* Small modal variant — narrower confirmation dialogs */
+.modal-sm {
+  max-width: 420px !important;
+}
