@@ -261,8 +261,7 @@ export default function Tables() {
         if (!showCheckoutFor) return;
         const tableInfo = showCheckoutFor;
         const elapsedMs = Math.max(0, currentTime - tableInfo.startTime);
-        const cappedMs = Math.min(elapsedMs, 60 * 60000);
-        const minsElapsed = cappedMs / 60000;
+        const minsElapsed = elapsedMs / 60000;
         const rawPlayedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
         const playedCost = Math.max(rawPlayedCost, MIN_PLAY_COST);
         const foodCost = (tableInfo.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
@@ -302,8 +301,7 @@ export default function Tables() {
         if (!showCheckoutFor || !name.trim()) return;
         const tableInfo = showCheckoutFor;
         const elapsedMs = Math.max(0, currentTime - tableInfo.startTime);
-        const cappedMs = Math.min(elapsedMs, 60 * 60000);
-        const minsElapsed = cappedMs / 60000;
+        const minsElapsed = elapsedMs / 60000;
         const rawPlayedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
         const playedCost = Math.max(rawPlayedCost, MIN_PLAY_COST);
         const foodCost = (tableInfo.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
@@ -553,11 +551,8 @@ export default function Tables() {
         }
     };
 
-    const formatCountdown = (ms) => {
-        const defaultTime = 60 * 60000;
-        let remaining = defaultTime - ms;
-        if (remaining < 0) remaining = 0;
-        const totalSeconds = Math.floor(remaining / 1000);
+    const formatElapsed = (ms) => {
+        const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const mins = Math.floor((totalSeconds % 3600) / 60);
         const secs = totalSeconds % 60;
@@ -578,8 +573,7 @@ export default function Tables() {
     const getCheckoutCosts = (tableInfo) => {
         if (!tableInfo) return { minsElapsed: 0, playedCost: 0, foodCost: 0, total: 0, minimumApplied: false };
         const elapsedMs = Math.max(0, currentTime - tableInfo.startTime);
-        const cappedMs = Math.min(elapsedMs, 60 * 60000);
-        const minsElapsed = cappedMs / 60000;
+        const minsElapsed = elapsedMs / 60000;
         const rawPlayedCost = parseFloat((minsElapsed * tableInfo.rate).toFixed(2));
         const minimumApplied = rawPlayedCost < MIN_PLAY_COST;
         const playedCost = Math.max(rawPlayedCost, MIN_PLAY_COST);
@@ -729,8 +723,7 @@ export default function Tables() {
                 {filteredTables.map(table => {
                     const isOccupied = table.status === 'occupied';
                     const elapsedMs = isOccupied ? Math.max(0, currentTime - table.startTime) : 0;
-                    const cappedMs = Math.min(elapsedMs, 60 * 60000);
-                    const timeCost = isOccupied ? (cappedMs / 60000 * table.rate).toFixed(2) : '0.00';
+                    const timeCost = isOccupied ? (elapsedMs / 60000 * table.rate).toFixed(2) : '0.00';
                     const foodCost = (table.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
 
 
@@ -749,11 +742,11 @@ export default function Tables() {
                                 <div className="tc-timer-col">
                                     {isOccupied ? (
                                         <>
-                                            <div className={`tc-big-timer${elapsedMs >= 3600000 ? ' tc-timer-expired' : ''}`}>{formatCountdown(elapsedMs)}</div>
+                                            <div className="tc-big-timer">{formatElapsed(elapsedMs)}</div>
                                         </>
                                     ) : (
                                         <>
-                                            <div className="tc-big-timer">60:00</div>
+                                            <div className="tc-big-timer">00:00:00</div>
                                             <div className="tc-running-dot text-muted">Ready</div>
                                         </>
                                     )}
