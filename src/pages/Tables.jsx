@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Square, Plus, Minus, Clock, X, Utensils, Bell, AlertTriangle, Trash2, ShoppingBag, User, MoreVertical } from 'lucide-react';
+import { Play, Square, Plus, Minus, Clock, X, Utensils, Bell, AlertTriangle, Trash2, ShoppingBag, User, MoreVertical, ChevronDown } from 'lucide-react';
 import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, writeBatch, deleteDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -17,12 +17,14 @@ export default function Tables() {
     const [showCanteenFor, setShowCanteenFor] = useState(null); // table id
     const [canteenTab, setCanteenTab] = useState('Snacks'); // 'Snacks' | 'Drinks' | 'Tobacco'
     const [inventory, setInventory] = useState([]);
+    const [bills, setBills] = useState([]); // for customer name suggestions in due flow
 
     // Checkout State
     const [showCheckoutFor, setShowCheckoutFor] = useState(null);
     // Due flow: 'checkout' | 'name_input'
     const [checkoutStep, setCheckoutStep] = useState('checkout');
     const [dueName, setDueName] = useState('');
+    const [showDueSuggestions, setShowDueSuggestions] = useState(false);
     const [showAlerts, setShowAlerts] = useState(false);
     const alertBtnRef = useRef(null);
     const alertDropRef = useRef(null);
@@ -159,6 +161,18 @@ export default function Tables() {
             setInventory(fetchedInventory);
         });
         return () => unsubscribe();
+    }, [clubId]);
+
+    // Fetch this club's bills (for existing customer name suggestions)
+    useEffect(() => {
+        if (!clubId) return;
+        const q = query(collection(db, 'bills'), where('clubId', '==', clubId));
+        const unsub = onSnapshot(q, (snap) => {
+            const data = [];
+            snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+            setBills(data);
+        });
+        return () => unsub();
     }, [clubId]);
 
     // ── Start session helpers ──
@@ -725,7 +739,9 @@ export default function Tables() {
                     const elapsedMs = isOccupied ? Math.max(0, currentTime - table.startTime) : 0;
                     const timeCost = isOccupied ? (elapsedMs / 60000 * table.rate).toFixed(2) : '0.00';
                     const foodCost = (table.orders || []).reduce((sum, o) => sum + (o.price * o.qty), 0);
-
+                    // Show delete-timer button for first 60 seconds after start
+                    const canDeleteTimer = isOccupied && elapsedMs < 60000;
+                    const deleteTimerSecsLeft = canDeleteTimer ? Math.ceil((60000 - elapsedMs) / 1000) : 0;
 
                     return (
                         <div key={table.id} className={`table-card-v2 glass-panel ${isOccupied ? 'occupied' : 'free'}`}>
@@ -797,9 +813,54 @@ export default function Tables() {
 
                             <div className="tc-bottom-actions">
                                 {isOccupied ? (
-                                    <button className="tc-action-circle bg-red border-none hover:bg-red-700" onClick={() => handleOpenCheckout(table)} title="End Session" style={{ width: '100%', borderRadius: '8px' }}>
-                                        <Square size={20} fill="#fff" className="mr-2" /> End Session
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                                        <button
+                                            className="tc-action-circle bg-red border-none hover:bg-red-700"
+                                            onClick={() => handleOpenCheckout(table)}
+                                            title="End Session"
+                                            style={{ flex: 1, borderRadius: '8px', height: '48px' }}
+                                        >
+                                            <Square size={20} fill="#fff" className="mr-2" /> End Session
+                                        </button>
+                                        {canDeleteTimer && (
+                                            <button
+                                                title={`Undo start — expires in ${deleteTimerSecsLeft}s`}
+                                                style={{
+                                                    flex: 1,
+                                                    height: '48px',
+                                                    borderRadius: '8px',
+                                                    padding: '0 0.75rem',
+                                                    background: 'rgba(239,68,68,0.12)',
+                                                    border: '1px solid rgba(239,68,68,0.45)',
+                                                    color: '#f87171',
+                                                    fontWeight: 700,
+                                                    fontSize: '0.82rem',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '0.4rem',
+                                                    transition: 'background 0.18s',
+                                                }}
+                                                onClick={async () => {
+                                                    try {
+                                                        await updateDoc(doc(db, 'tables', table.id), {
+                                                            status: 'free',
+                                                            startTime: null,
+                                                            pausedTime: 0,
+                                                            orders: [],
+                                                            activeControllers: table.activeControllers ?? null,
+                                                        });
+                                                    } catch (err) {
+                                                        console.error('Error deleting timer:', err);
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 size={13} />
+                                                Delete Timer ({deleteTimerSecsLeft}s)
+                                            </button>
+                                        )}
+                                    </div>
                                 ) : (
                                     <button
                                         className="tc-action-circle bg-green tooltip-container"
@@ -872,37 +933,12 @@ export default function Tables() {
                             <p className="text-muted text-sm">{showStartModal.name}</p>
                         </div>
 
-                        {/* Start Now — green (TOP) */}
-                        <div style={{ padding: '0 1.5rem 1rem' }}>
-                            <button
-                                className="tc-action-circle bg-green"
-                                style={{ width: '100%', borderRadius: '10px', padding: '0.85rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', border: 'none', cursor: 'pointer', fontWeight: 700 }}
-                                onClick={() => {
-                                    if (showStartModal.type === 'Play Station' && showStartModal.controllerRates) {
-                                        setShowPsStartModal(showStartModal);
-                                    } else {
-                                        handleStartNow();
-                                    }
-                                }}
-                            >
-                                <Play size={18} fill="#fff" />
-                                Start Now
-                            </button>
-                        </div>
-
-                        {/* Divider */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0 1.5rem 0.85rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
-                            or set custom start time
-                            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
-                        </div>
-
-                        {/* Custom Time — 12hr with AM/PM (BOTTOM) */}
-                        <div style={{ padding: '0 1.5rem 1.5rem' }}>
-                            <label className="text-sm text-muted" style={{ display: 'block', marginBottom: '0.5rem' }}>
+                        {/* ── Custom time inputs (TOP) ── */}
+                        <div style={{ padding: '0 1.5rem 0.85rem' }}>
+                            <label className="text-sm text-muted" style={{ display: 'block', marginBottom: '0.6rem', fontWeight: 600 }}>
                                 When did the session actually start?
                             </label>
-                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.85rem' }}>
                                 {/* Hour */}
                                 <input
                                     type="number"
@@ -943,26 +979,84 @@ export default function Tables() {
                                 >
                                     {startAmPm}
                                 </button>
-                                {/* Set Time button — pure white bg, black text */}
-                                <button
-                                    type="button"
-                                    className="modal-action-btn"
-                                    style={{ flex: 1, padding: '0.65rem 0.8rem', background: '#ffffff', color: '#111111', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                                    onClick={() => {
-                                        if (showStartModal.type === 'Play Station' && showStartModal.controllerRates) {
-                                            setStartTimeError('');
-                                            setShowPsStartModal(showStartModal);
-                                        } else {
-                                            handleStartCustomTime();
-                                        }
-                                    }}
-                                >
-                                    Set Time
-                                </button>
                             </div>
+
                             {startTimeError && (
-                                <div style={{ color: '#f87171', fontSize: '0.8rem', marginTop: '0.4rem' }}>⚠ {startTimeError}</div>
+                                <div style={{ color: '#f87171', fontSize: '0.8rem', marginBottom: '0.5rem' }}>⚠ {startTimeError}</div>
                             )}
+
+                            {/* Set Time — equal-weight button */}
+                            <button
+                                type="button"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.85rem',
+                                    background: '#ffffff',
+                                    color: '#111111',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    fontSize: '1rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                }}
+                                onClick={() => {
+                                    if (showStartModal.type === 'Play Station' && showStartModal.controllerRates) {
+                                        const h = parseInt(startHour, 10);
+                                        const m = parseInt(startMinute, 10);
+                                        if (isNaN(h) || isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) {
+                                            setStartTimeError('Invalid time. Use 1–12 for hour and 00–59 for minutes.');
+                                            return;
+                                        }
+                                        let hours24 = h % 12;
+                                        if (startAmPm === 'PM') hours24 += 12;
+                                        const nowD = new Date();
+                                        const parsedTs = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate(), hours24, m, 0, 0);
+                                        if (parsedTs.getTime() > Date.now()) {
+                                            setStartTimeError('Start time cannot be in the future.');
+                                            return;
+                                        }
+                                        setCustomStartTime(`${String(hours24).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+                                        setStartTimeError('');
+                                        setShowPsStartModal(showStartModal);
+                                    } else {
+                                        handleStartCustomTime();
+                                    }
+                                }}
+                            >
+                                <Clock size={18} />
+                                Set Time
+                            </button>
+                        </div>
+
+                        {/* Divider */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0 1.5rem 0.85rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+                            or start from right now
+                            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+                        </div>
+
+                        {/* Start Now — green (BOTTOM) */}
+                        <div style={{ padding: '0 1.5rem 1.5rem' }}>
+                            <button
+                                className="tc-action-circle bg-green"
+                                style={{ width: '100%', borderRadius: '10px', padding: '0.85rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', border: 'none', cursor: 'pointer', fontWeight: 700 }}
+                                onClick={() => {
+                                    if (showStartModal.type === 'Play Station' && showStartModal.controllerRates) {
+                                        // Reset customStartTime so player count modal uses Date.now()
+                                        setCustomStartTime('');
+                                        setShowPsStartModal(showStartModal);
+                                    } else {
+                                        handleStartNow();
+                                    }
+                                }}
+                            >
+                                <Play size={18} fill="#fff" />
+                                Start Now
+                            </button>
                         </div>
                     </div>
                 </div>,
@@ -1156,32 +1250,112 @@ export default function Tables() {
                                 </div>
                             )}
 
-                            {checkoutStep === 'name_input' && (
-                                <div className="checkout-due-step">
-                                    <div className="due-step-title">
-                                        <User size={16} /> Who is leaving without paying?
+                            {checkoutStep === 'name_input' && (() => {
+                                const allCustomerNames = [...new Set(
+                                    bills
+                                        .filter(b => b.personName && b.personName.trim())
+                                        .map(b => b.personName.trim())
+                                )];
+                                const suggestions = dueName.trim().length > 0
+                                    ? allCustomerNames.filter(n => n.toLowerCase().includes(dueName.toLowerCase())).slice(0, 7)
+                                    : allCustomerNames.slice(0, 7);
+
+                                return (
+                                    <div className="checkout-due-step">
+                                        <div className="due-step-title">
+                                            <User size={16} /> Who is leaving without paying?
+                                        </div>
+
+                                        {/* Searchable name input with manual-trigger dropdown */}
+                                        <div style={{ position: 'relative' }}>
+                                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                                <input
+                                                    className="glass-input"
+                                                    placeholder="Enter or search customer name"
+                                                    value={dueName}
+                                                    onChange={e => setDueName(e.target.value)}
+                                                    autoFocus
+                                                    style={{ paddingRight: '2.6rem', width: '100%', boxSizing: 'border-box' }}
+                                                    onBlur={() => setTimeout(() => setShowDueSuggestions(false), 150)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter' && dueName.trim()) { setShowDueSuggestions(false); finalizeCheckoutDue(dueName); }
+                                                        if (e.key === 'Escape') setShowDueSuggestions(false);
+                                                    }}
+                                                />
+                                                {/* Dropdown toggle button */}
+                                                {allCustomerNames.length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onMouseDown={e => { e.preventDefault(); setShowDueSuggestions(s => !s); }}
+                                                        style={{
+                                                            position: 'absolute', right: '0.6rem',
+                                                            background: 'none', border: 'none', cursor: 'pointer',
+                                                            color: showDueSuggestions ? 'var(--electric-blue, #63b3ed)' : 'var(--text-muted)',
+                                                            display: 'flex', alignItems: 'center', padding: '0.25rem',
+                                                            transition: 'color 0.15s, transform 0.2s',
+                                                            transform: showDueSuggestions ? 'rotate(180deg)' : 'rotate(0deg)',
+                                                        }}
+                                                        title="Show existing customers"
+                                                    >
+                                                        <ChevronDown size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {showDueSuggestions && suggestions.length > 0 && (
+                                                <div style={{
+                                                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 9999,
+                                                    background: 'var(--bg-card, #1a1a2e)',
+                                                    border: '1px solid rgba(255,255,255,0.12)',
+                                                    borderRadius: '10px',
+                                                    overflow: 'hidden',
+                                                    boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                                                }}>
+                                                    {suggestions.map(name => (
+                                                        <button
+                                                            key={name}
+                                                            type="button"
+                                                            style={{
+                                                                width: '100%', padding: '0.6rem 0.85rem',
+                                                                display: 'flex', alignItems: 'center', gap: '0.6rem',
+                                                                background: 'transparent', border: 'none',
+                                                                color: 'var(--text-primary)', cursor: 'pointer',
+                                                                fontSize: '0.88rem', textAlign: 'left',
+                                                                borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                                                transition: 'background 0.12s',
+                                                            }}
+                                                            onMouseDown={() => { setDueName(name); setShowDueSuggestions(false); }}
+                                                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                                        >
+                                                            <div style={{
+                                                                width: 28, height: 28, borderRadius: '50%',
+                                                                background: 'rgba(59,130,246,0.18)', color: '#63b3ed',
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                fontWeight: 700, fontSize: '0.8rem', flexShrink: 0,
+                                                            }}>
+                                                                {name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <span style={{ flex: 1 }}>{name}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '0.6rem' }}>
+                                            <button className="glass-button modal-action-btn" style={{ flex: 1 }} onClick={() => { setCheckoutStep('checkout'); setShowDueSuggestions(false); }}>← Back</button>
+                                            <button
+                                                className="modal-action-btn checkout-due-btn"
+                                                style={{ flex: 2 }}
+                                                disabled={!dueName.trim()}
+                                                onClick={() => { setShowDueSuggestions(false); finalizeCheckoutDue(dueName); }}
+                                            >
+                                                Confirm Due
+                                            </button>
+                                        </div>
                                     </div>
-                                    <input
-                                        className="glass-input"
-                                        placeholder="Enter customer name for Due"
-                                        value={dueName}
-                                        onChange={e => setDueName(e.target.value)}
-                                        autoFocus
-                                        onKeyDown={e => { if (e.key === 'Enter' && dueName.trim()) finalizeCheckoutDue(dueName); }}
-                                    />
-                                    <div style={{ display: 'flex', gap: '0.6rem' }}>
-                                        <button className="glass-button modal-action-btn" style={{ flex: 1 }} onClick={() => setCheckoutStep('checkout')}>← Back</button>
-                                        <button
-                                            className="modal-action-btn checkout-due-btn"
-                                            style={{ flex: 2 }}
-                                            disabled={!dueName.trim()}
-                                            onClick={() => finalizeCheckoutDue(dueName)}
-                                        >
-                                            Confirm Due
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                                );
+                            })()}
                         </div>
                     </div>
                 );

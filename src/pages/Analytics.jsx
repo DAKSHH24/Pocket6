@@ -7,7 +7,7 @@ import {
     TrendingUp, Table, CupSoda, Lock, FileClock, Trash2, Plus, Receipt, Box, Wrench, X, Tag, ShoppingCart, DollarSign, Calendar, ChevronDown, KeyRound, RotateCcw, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import {
-    collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, where
+    collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, where, getDocs, writeBatch
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -262,6 +262,10 @@ export default function Analytics() {
     const [expCategory, setExpCategory] = useState('inventory_purchase');
     const [expDesc, setExpDesc] = useState('');
 
+    // Reset All Data
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [resetBusy, setResetBusy] = useState(false);
+
     useEffect(() => { setIsAuthenticated(false); }, []);
 
     useEffect(() => {
@@ -286,10 +290,10 @@ export default function Analytics() {
     }, [isAuthenticated, clubId]);
 
     useEffect(() => {
-        if (showExpenseModal) document.body.style.overflow = 'hidden';
+        if (showExpenseModal || showResetConfirm) document.body.style.overflow = 'hidden';
         else document.body.style.overflow = '';
         return () => { document.body.style.overflow = ''; };
-    }, [showExpenseModal]);
+    }, [showExpenseModal, showResetConfirm]);
 
     // ── Handle preset selection → update calendar dates ──
     function handlePreset(val) {
@@ -471,6 +475,28 @@ export default function Analytics() {
         try { await deleteDoc(doc(db, 'expenses', id)); } catch (err) { console.error(err); }
     };
 
+    // ── Reset All Analytics Data ──
+    const handleResetAll = async () => {
+        setResetBusy(true);
+        try {
+            const COLLECTIONS_TO_CLEAR = ['session_history', 'expenses', 'bills'];
+            for (const colName of COLLECTIONS_TO_CLEAR) {
+                const snap = await getDocs(query(collection(db, colName), where('clubId', '==', clubId)));
+                // Delete in batches of 500
+                for (let i = 0; i < snap.docs.length; i += 500) {
+                    const batch = writeBatch(db);
+                    snap.docs.slice(i, i + 500).forEach(d => batch.delete(doc(db, colName, d.id)));
+                    await batch.commit();
+                }
+            }
+        } catch (err) {
+            console.error('Reset error:', err);
+        } finally {
+            setResetBusy(false);
+            setShowResetConfirm(false);
+        }
+    };
+
     // ─────────────────────────────────────────────────────────────
     // RENDER
     // ─────────────────────────────────────────────────────────────
@@ -479,8 +505,28 @@ export default function Analytics() {
             {/* Header */}
             <div className="page-header mb-4">
                 <div>
-                    <h2>Financial Analytics & Reports</h2>
+                    <h2>Financial Analytics &amp; Reports</h2>
                 </div>
+                <button
+                    onClick={() => setShowResetConfirm(true)}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '0.4rem',
+                        padding: '0.5rem 1rem',
+                        background: 'rgba(239,68,68,0.1)',
+                        border: '1px solid rgba(239,68,68,0.35)',
+                        borderRadius: '8px',
+                        color: '#f87171',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        transition: 'background 0.18s',
+                        whiteSpace: 'nowrap',
+                    }}
+                    title="Reset all analytics data"
+                >
+                    <Trash2 size={14} />
+                    Reset All Data
+                </button>
             </div>
 
             {/* Nav Tabs */}
@@ -1003,6 +1049,53 @@ export default function Analytics() {
                                 <button type="submit" className="primary-button modal-action-btn" style={{ background: '#ef4444', color: 'white' }}>Save Operational Log</button>
                             </div>
                         </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+            {/* ── RESET ALL CONFIRMATION MODAL ── */}
+            {showResetConfirm && createPortal(
+                <div className="overlay" onClick={() => { if (!resetBusy) setShowResetConfirm(false); }}>
+                    <div className="modal modal-relative modal-sm" onClick={e => e.stopPropagation()}>
+                        {!resetBusy && (
+                            <button className="modal-close-btn" onClick={() => setShowResetConfirm(false)}><X size={18} /></button>
+                        )}
+                        <div className="modal-header-block" style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>⚠️</div>
+                            <h3 className="text-xl font-bold text-glow-red">Reset All Data?</h3>
+                            <p className="text-muted text-sm" style={{ marginTop: '0.6rem', lineHeight: 1.6 }}>
+                                This will permanently delete all <strong style={{ color: 'var(--text-primary)' }}>session history, expenses &amp; bills</strong>.
+                                <br />Your tables and inventory will <strong style={{ color: 'var(--text-primary)' }}>not</strong> be affected.
+                                <br /><span style={{ color: '#f87171', fontWeight: 600 }}>This action cannot be undone.</span>
+                            </p>
+                        </div>
+                        <div className="checkout-action-row" style={{ paddingTop: '0.5rem' }}>
+                            <button
+                                className="glass-button modal-action-btn"
+                                disabled={resetBusy}
+                                onClick={() => setShowResetConfirm(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="modal-action-btn"
+                                disabled={resetBusy}
+                                style={{
+                                    flex: 1,
+                                    background: resetBusy ? 'rgba(239,68,68,0.4)' : 'linear-gradient(135deg,#ef4444,#dc2626)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    fontWeight: 700,
+                                    cursor: resetBusy ? 'not-allowed' : 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                                }}
+                                onClick={handleResetAll}
+                            >
+                                <Trash2 size={15} />
+                                {resetBusy ? 'Deleting…' : 'Yes'}
+                            </button>
+                        </div>
                     </div>
                 </div>,
                 document.body

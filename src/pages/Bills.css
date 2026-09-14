@@ -172,7 +172,13 @@
     max-width: 340px;
 }
 
-/* ── Bills List ── */
+/* ── Bills Masonry Layout ── */
+.bills-masonry {
+    columns: 3;
+    column-gap: 1rem;
+}
+
+/* Legacy grid class kept for any other use */
 .bills-list {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -180,25 +186,313 @@
     align-items: start;
 }
 
-.bill-card {
+/* ── Customer-Grouped Bill Cards ── */
+.customer-bill-card {
     border-radius: 14px;
     overflow: hidden;
-    transition: transform 0.18s, box-shadow 0.18s;
+    transition: box-shadow 0.18s;
+    border-left: 4px solid #f59e0b;
+    break-inside: avoid;
+    margin-bottom: 1rem;
+    display: inline-block; /* needed for CSS columns */
+    width: 100%;
 }
 
-.bill-card:hover {
-    transform: translateY(-2px);
+.customer-bill-card:hover {
     box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
 
-.bill-card.due {
-    border-left: 4px solid #f59e0b;
+.customer-bill-card.expanded {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.28);
 }
 
-.bill-card.paid {
-    border-left: 4px solid #10b981;
-    opacity: 0.75;
+/* ── Card header (clickable row) ── */
+.cbk-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem 0.85rem;
+    gap: 1rem;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
 }
+
+.cbk-header:hover {
+    background: rgba(255,255,255,0.03);
+}
+
+.cbk-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.cbk-total {
+    font-size: 1.35rem;
+    font-weight: 800;
+    font-family: var(--font-heading);
+    color: #f59e0b;
+}
+
+.cbk-expand-icon {
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+}
+
+/* ── Multi-due hint bar (collapsed) ── */
+.cbk-multi-hint {
+    padding: 0.4rem 1.25rem 0.65rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    transition: color 0.15s, background 0.15s;
+}
+
+.cbk-multi-hint:hover {
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.02);
+}
+
+/* ── Expanded entries container ── */
+.cbk-entries {
+    border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+/* ── Individual due row ── */
+.cde-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid rgba(255,255,255,0.045);
+    transition: background 0.15s;
+}
+
+.cde-row:last-of-type {
+    border-bottom: none;
+}
+
+.cde-row:hover {
+    background: rgba(255,255,255,0.025);
+}
+
+.cde-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.cde-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 0.18rem 0.55rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    width: fit-content;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cde-date {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.71rem;
+    color: var(--text-muted);
+}
+
+.cde-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+}
+
+.cde-breakdown-line {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+}
+
+.cde-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.cde-amount {
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.cde-pay-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.7rem;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.74rem;
+    cursor: pointer;
+    transition: opacity 0.18s;
+    white-space: nowrap;
+}
+
+.cde-pay-btn:hover {
+    opacity: 0.85;
+}
+
+.cde-del-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 6px;
+    color: #ef4444;
+    cursor: pointer;
+    transition: background 0.18s;
+    flex-shrink: 0;
+}
+
+.cde-del-btn:hover {
+    background: rgba(239,68,68,0.2);
+}
+
+/* ── Mark All Paid row ── */
+.cbk-mark-all-row {
+    padding: 0.6rem 1.25rem 0.85rem;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.cbk-mark-all-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.62rem 1rem;
+    background: linear-gradient(135deg, rgba(16,185,129,0.14), rgba(5,150,105,0.1));
+    border: 1px solid rgba(16,185,129,0.28);
+    border-radius: 9px;
+    color: #10b981;
+    font-weight: 700;
+    font-size: 0.84rem;
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s;
+}
+
+.cbk-mark-all-btn:hover {
+    background: linear-gradient(135deg, rgba(16,185,129,0.24), rgba(5,150,105,0.18));
+    border-color: rgba(16,185,129,0.45);
+}
+
+/* ── Canteen item breakdown inside expanded row ── */
+.cde-canteen-block {
+    margin-top: 0.3rem;
+    padding: 0.4rem 0.5rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 7px;
+}
+
+.cde-canteen-header {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.73rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+}
+
+.cde-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.18rem 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+.cde-item-name {
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+}
+
+.cde-item-price {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+    .bills-masonry {
+        columns: 2;
+    }
+    .bills-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 680px) {
+    .bills-masonry {
+        columns: 1;
+    }
+    .bills-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .bills-summary-row {
+        grid-template-columns: 1fr;
+    }
+
+    .cbk-header {
+        padding: 0.85rem 1rem 0.7rem;
+    }
+
+    .cde-row {
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+
+    .cde-right {
+        flex-direction: row;
+        align-items: center;
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
 
 /* Card Header */
 .bill-card-header {
