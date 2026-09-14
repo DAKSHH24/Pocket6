@@ -219,12 +219,12 @@ export default function Bills() {
                                                         </div>
 
                                                         {/* Cost breakdown lines */}
-                                                        {bill.type === 'session' && bill.playedCost > 0 && (
+                                                        {/* {bill.type === 'session' && bill.playedCost > 0 && (
                                                             <div className="cde-breakdown-line">
                                                                 <Gamepad2 size={11} />
                                                                 Table Time — ₹{(bill.playedCost || 0).toFixed(2)}
                                                             </div>
-                                                        )}
+                                                        )} */}
 
                                                         {/* Canteen items with individual prices */}
                                                         {(bill.orders || []).length > 0 && (
