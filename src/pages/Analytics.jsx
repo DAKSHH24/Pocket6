@@ -729,7 +729,7 @@ export default function Analytics() {
             )}
 
             {/* ─── F&B FINANCIALS TAB ─── */}
-            {activeTab === 'F&B Financials' && (
+            {activeTab === 'Financials' && (
                 <div className="analytics-section">
                     <div className="analytics-kpi-grid">
                         <div className="glass-panel kpi-card">

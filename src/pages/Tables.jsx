@@ -645,7 +645,7 @@ export default function Tables() {
                         <ShoppingBag size={16} /> Walk-in Order
                     </button>
                     <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                        <button className="primary-button" onClick={() => setShowAddModal(true)}>+ Add New Table</button>
+                        <button className="primary-button" onClick={() => setShowAddModal(true)}>Add New Table</button>
                         {/* Shared ⋮ menu for table deletion — at extreme right */}
                         {tables.some(t => t.status !== 'occupied') && (
                             <div className="tc-three-dot-wrap" ref={headerMenuRef}>
@@ -701,7 +701,7 @@ export default function Tables() {
                 <input
                     type="text"
                     className="glass-input search-input"
-                    placeholder="Search tables by name…"
+                    placeholder="Search table names"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -729,7 +729,7 @@ export default function Tables() {
                         </div>
                         <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
                             {tables.length === 0
-                                ? 'Click "+ Add New Table" to set up your first table.'
+                                ? 'Click "Add New Table" to set up your first table.'
                                 : 'Try a different search or filter.'}
                         </div>
                     </div>
