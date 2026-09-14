@@ -1304,7 +1304,7 @@ export default function Tables() {
                                             {showDueSuggestions && suggestions.length > 0 && (
                                                 <div style={{
                                                     position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 9999,
-                                                    background: 'var(--bg-card, #1a1a2e)',
+                                                    background: 'var(--bg-card, #000000)',
                                                     border: '1px solid rgba(255,255,255,0.12)',
                                                     borderRadius: '10px',
                                                     overflow: 'hidden',

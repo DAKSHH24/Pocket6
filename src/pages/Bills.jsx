@@ -77,9 +77,6 @@ export default function Bills() {
     const todayStr = new Date().toDateString();
     const dueBills = bills.filter(b => b.status === 'due');
     const totalDue = dueBills.reduce((s, b) => s + (b.totalAmount || 0), 0);
-    const paidToday = bills
-        .filter(b => b.status === 'paid' && b.paidAt && new Date(b.paidAt).toDateString() === todayStr)
-        .reduce((s, b) => s + (b.totalAmount || 0), 0);
 
     // Filtered dues based on active tab
     const filtered = dueBills.filter(b => {
@@ -123,37 +120,27 @@ export default function Bills() {
                 </div>
             </div>
 
-            {/* Summary Cards */}
-            <div className="bills-summary-row">
-                <div className="bills-stat-card glass-panel due">
-                    <div className="bsc-icon"><AlertCircle size={22} /></div>
-                    <div className="bsc-info">
-                        <div className="bsc-label">Outstanding Dues</div>
-                        <div className="bsc-value">₹{totalDue.toFixed(2)}</div>
-                        <div className="bsc-count">
-                            {dueBills.length} unpaid bill{dueBills.length !== 1 ? 's' : ''} · {sortedGroups.length > 0 || filtered.length === 0 ? Object.keys(customerGroupsMap).length : sortedGroups.length} customer{Object.keys(customerGroupsMap).length !== 1 ? 's' : ''}
-                        </div>
-                    </div>
-                </div>
-                <div className="bills-stat-card glass-panel paid">
-                    <div className="bsc-icon"><CheckCircle2 size={22} /></div>
-                    <div className="bsc-info">
-                        <div className="bsc-label">Recovered Today</div>
-                        <div className="bsc-value">₹{paidToday.toFixed(2)}</div>
-                        <div className="bsc-count">cleared today — see Analytics for history</div>
+            {/* Summary — only Outstanding Dues */}
+            <div className="bills-stat-card glass-panel due" style={{ maxWidth: 420 }}>
+                <div className="bsc-icon"><AlertCircle size={22} /></div>
+                <div className="bsc-info">
+                    <div className="bsc-label">Outstanding Dues</div>
+                    <div className="bsc-value">₹{totalDue.toFixed(2)}</div>
+                    <div className="bsc-count">
+                        {dueBills.length} unpaid bill{dueBills.length !== 1 ? 's' : ''} · {Object.keys(customerGroupsMap).length} customer{Object.keys(customerGroupsMap).length !== 1 ? 's' : ''}
                     </div>
                 </div>
             </div>
 
-            {/* Tab filter */}
+            {/* Tab filter — Today first */}
             <div className="bills-tabs glass-panel">
-                <button className={`bills-tab-btn${activeTab === 'all' ? ' active' : ''}`} onClick={() => setActiveTab('all')}>
-                    All Dues
-                    {dueBills.length > 0 && <span className="bills-tab-badge">{dueBills.length}</span>}
-                </button>
                 <button className={`bills-tab-btn${activeTab === 'today' ? ' active' : ''}`} onClick={() => setActiveTab('today')}>
                     <Clock size={14} /> Today
                     {todayCount > 0 && <span className="bills-tab-badge">{todayCount}</span>}
+                </button>
+                <button className={`bills-tab-btn${activeTab === 'all' ? ' active' : ''}`} onClick={() => setActiveTab('all')}>
+                    All Dues
+                    {dueBills.length > 0 && <span className="bills-tab-badge">{dueBills.length}</span>}
                 </button>
                 <button className={`bills-tab-btn${activeTab === 'session' ? ' active' : ''}`} onClick={() => setActiveTab('session')}>
                     <Gamepad2 size={14} /> Session
@@ -257,15 +244,17 @@ export default function Bills() {
                                                         )}
                                                     </div>
 
-                                                    {/* Right: amount + actions */}
+                                                    {/* Right: amount + actions on one row */}
                                                     <div className="cde-right">
                                                         <div className="cde-amount">₹{(bill.totalAmount || 0).toFixed(2)}</div>
-                                                        <button className="cde-pay-btn" onClick={() => markAsPaid(bill.id)}>
-                                                            <CheckCircle2 size={13} /> Paid
-                                                        </button>
-                                                        <button className="cde-del-btn" onClick={() => setDeleteConfirmId(bill.id)}>
-                                                            <Trash2 size={13} />
-                                                        </button>
+                                                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                                            <button className="cde-pay-btn" onClick={() => markAsPaid(bill.id)}>
+                                                                <CheckCircle2 size={13} /> Paid
+                                                            </button>
+                                                            <button className="cde-del-btn" onClick={() => setDeleteConfirmId(bill.id)}>
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))}
