@@ -531,7 +531,7 @@ export default function Analytics() {
 
             {/* Nav Tabs */}
             <div className="analytics-tab-bar glass-panel mb-6">
-                {['Overview', 'F&B Financials', 'Session History', 'Expenses'].map(tab => (
+                {['Overview', 'Financials', 'Session History', 'Expenses'].map(tab => (
                     <button
                         key={tab}
                         className={`analytics-tab-btn${activeTab === tab ? ' active' : ''}`}
