@@ -498,16 +498,12 @@ export default function AuthPage() {
       <div className={`auth-card ${view === 'register' ? 'scrollable' : ''}`}>
         {/* Brand */}
         <div className="auth-brand">
-          <div className="auth-logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <circle cx="12" cy="12" r="4" />
-              <line x1="12" y1="2" x2="12" y2="8" />
-              <line x1="12" y1="16" x2="12" y2="22" />
-            </svg>
-          </div>
+          <img
+            src="/cuebase-logo.png"
+            alt="Cue Base Logo"
+            style={{ width: '90px', height: '90px', objectFit: 'contain', borderRadius: '16px', marginBottom: '0.75rem' }}
+          />
           <h1>Cue Base</h1>
-          {/* <p>Venue Management System</p> */}
         </div>
 
         {view === 'login'    && <LoginView    onForgotPassword={() => setView('forgot')} onRegister={() => setView('register')} />}

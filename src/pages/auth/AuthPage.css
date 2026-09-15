@@ -26,7 +26,7 @@
 .auth-orb-1 {
   width: 480px;
   height: 480px;
-  background: radial-gradient(circle, #3b82f6, transparent 70%);
+  background: radial-gradient(circle, #10b981, transparent 70%);
   top: -120px;
   left: -120px;
   animation-delay: 0s;
@@ -35,7 +35,7 @@
 .auth-orb-2 {
   width: 380px;
   height: 380px;
-  background: radial-gradient(circle, #8b5cf6, transparent 70%);
+  background: radial-gradient(circle, #059669, transparent 70%);
   bottom: -80px;
   right: -80px;
   animation-delay: -3s;
@@ -105,10 +105,10 @@
   justify-content: center;
   width: 56px;
   height: 56px;
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   border-radius: 14px;
   margin-bottom: 1rem;
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
 }
 
 .auth-logo svg {
@@ -199,7 +199,7 @@
 }
 
 .auth-input-wrap:focus-within .input-icon {
-  color: #3b82f6;
+  color: #10b981;
 }
 
 .auth-input {
@@ -220,9 +220,9 @@
 }
 
 .auth-input:focus {
-  border-color: rgba(59, 130, 246, 0.5);
+  border-color: rgba(16, 185, 129, 0.5);
   background: rgba(0, 0, 0, 0.5);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
 .auth-input.no-icon {
@@ -259,7 +259,7 @@
 .auth-forgot button {
   background: none;
   border: none;
-  color: #3b82f6;
+  color: #10b981;
   font-size: 0.8rem;
   cursor: pointer;
   font-family: 'Inter', sans-serif;
@@ -279,7 +279,7 @@
 .auth-btn-primary {
   width: 100%;
   padding: 0.8rem 1rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   border: none;
   border-radius: 10px;
   color: #fff;
@@ -293,14 +293,14 @@
   gap: 0.5rem;
   margin-top: 0.5rem;
   transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
   letter-spacing: 0.01em;
 }
 
 .auth-btn-primary:hover:not(:disabled) {
   opacity: 0.92;
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.45);
 }
 
 .auth-btn-primary:active:not(:disabled) {
@@ -361,7 +361,7 @@
 .auth-switch button {
   background: none;
   border: none;
-  color: #3b82f6;
+  color: #10b981;
   font-size: 0.83rem;
   font-family: 'Inter', sans-serif;
   font-weight: 600;
@@ -418,8 +418,8 @@
 .auth-email-icon {
   width: 72px;
   height: 72px;
-  background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15));
-  border: 1px solid rgba(59,130,246,0.2);
+  background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.15));
+  border: 1px solid rgba(16,185,129,0.25);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -436,7 +436,7 @@
 .auth-email-icon svg {
   width: 32px;
   height: 32px;
-  color: #3b82f6;
+  color: #10b981;
 }
 
 .auth-email-sent h2 {
@@ -460,7 +460,7 @@
 .auth-back-link {
   background: none;
   border: none;
-  color: #3b82f6;
+  color: #10b981;
   font-size: 0.83rem;
   font-family: 'Inter', sans-serif;
   cursor: pointer;
@@ -558,7 +558,7 @@
 
 .pw-strength-bar.active-weak   { background: #ef4444; }
 .pw-strength-bar.active-fair   { background: #f59e0b; }
-.pw-strength-bar.active-good   { background: #3b82f6; }
+.pw-strength-bar.active-good   { background: #10b981; }
 .pw-strength-bar.active-strong { background: #10b981; }
 
 .pw-strength-label {
