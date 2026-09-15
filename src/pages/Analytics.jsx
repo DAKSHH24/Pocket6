@@ -266,6 +266,9 @@ export default function Analytics() {
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [resetBusy, setResetBusy] = useState(false);
 
+    // Session delete confirm
+    const [deleteSessionId, setDeleteSessionId] = useState(null);
+
     useEffect(() => { setIsAuthenticated(false); }, []);
 
     useEffect(() => {
@@ -475,6 +478,15 @@ export default function Analytics() {
         try { await deleteDoc(doc(db, 'expenses', id)); } catch (err) { console.error(err); }
     };
 
+    const handleDeleteSession = async (id) => {
+        try {
+            await deleteDoc(doc(db, 'session_history', id));
+            setDeleteSessionId(null);
+        } catch (err) {
+            console.error('Error deleting session record:', err);
+        }
+    };
+
     // ── Reset All Analytics Data ──
     const handleResetAll = async () => {
         setResetBusy(true);
@@ -548,14 +560,14 @@ export default function Analytics() {
                         <div className="glass-panel kpi-card">
                             <div className="kpi-label">Total Revenue (Paid)</div>
                             <div className="kpi-value text-glow-green">₹{totalRev.toFixed(0)}</div>
-                            <div className="kpi-sub">{paidHistory.length} sessions paid</div>
+
                         </div>
                         <div className="glass-panel kpi-card">
                             <div className="kpi-label">Net Profit / Margin</div>
                             <div className={`kpi-value ${totalRev - totalExp >= 0 ? 'text-glow-green' : 'text-glow-red'}`}>
                                 ₹{(totalRev - totalExp).toFixed(0)}
                             </div>
-                            <div className="kpi-sub">Revenue minus Expenses</div>
+                            
                         </div>
                         <div className="glass-panel kpi-card">
                             <div className="kpi-label">Average Daily Revenue</div>
@@ -566,7 +578,7 @@ export default function Analytics() {
                             <div className="glass-panel kpi-card" style={{ borderLeft: '3px solid #f59e0b', background: 'linear-gradient(135deg, rgba(245,158,11,0.06) 0%, transparent 70%)' }}>
                                 <div className="kpi-label" style={{ color: '#f59e0b' }}>⚠ Outstanding Dues</div>
                                 <div className="kpi-value" style={{ color: '#f59e0b' }}>₹{totalDueAmt.toFixed(0)}</div>
-                                <div className="kpi-sub">{dueHistory.length} session{dueHistory.length !== 1 ? 's' : ''} unpaid — not counted in revenue</div>
+                                <div className="kpi-sub">Not counted in revenue</div>
                             </div>
                         )}
                     </div>
@@ -943,8 +955,34 @@ export default function Analytics() {
                                                 <span className="history-date">{item.date}</span>
                                             </div>
                                         </div>
-                                        <div className={`history-total ${item.paymentStatus === 'due' ? '' : 'text-glow-green'}`} style={item.paymentStatus === 'due' ? { color: '#f59e0b' } : {}}>
-                                            ₹{(item.totalCost || 0).toFixed(2)}
+                                        {/* Right side: amount + delete */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <div className={`history-total ${item.paymentStatus === 'due' ? '' : 'text-glow-green'}`} style={item.paymentStatus === 'due' ? { color: '#f59e0b' } : {}}>
+                                                ₹{(item.totalCost || 0).toFixed(2)}
+                                            </div>
+                                            {deleteSessionId === item.id ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                    <span style={{ fontSize: '0.75rem', color: '#f87171', whiteSpace: 'nowrap' }}>Delete?</span>
+                                                    <button
+                                                        onClick={() => handleDeleteSession(item.id)}
+                                                        style={{ background: 'rgba(239,68,68,0.18)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171', borderRadius: '6px', padding: '0.2rem 0.55rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                                                    >Yes</button>
+                                                    <button
+                                                        onClick={() => setDeleteSessionId(null)}
+                                                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', borderRadius: '6px', padding: '0.2rem 0.55rem', fontSize: '0.75rem', cursor: 'pointer' }}
+                                                    >No</button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setDeleteSessionId(item.id)}
+                                                    title="Delete this session record"
+                                                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.25rem', borderRadius: '6px', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                                                    onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+                                                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="history-card-breakdown">

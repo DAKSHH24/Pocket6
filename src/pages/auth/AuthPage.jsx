@@ -506,7 +506,7 @@ export default function AuthPage() {
               <line x1="12" y1="16" x2="12" y2="22" />
             </svg>
           </div>
-          <h1>Pocket 6</h1>
+          <h1>Cue Base</h1>
           {/* <p>Venue Management System</p> */}
         </div>
 

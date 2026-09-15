@@ -15,6 +15,15 @@ export default function Layout() {
     // Derive display initials from profile or email
     const displayName = userProfile?.ownerName || currentUser?.email || 'Owner';
     const clubName    = userProfile?.clubName   || 'My Venue';
+
+    // Update browser tab to show club name after login
+    useEffect(() => {
+        if (userProfile?.clubName) {
+            document.title = `${userProfile.clubName}`;
+        } else {
+            document.title = 'Cue Base';
+        }
+    }, [userProfile]);
     const initials    = displayName
         .split(' ')
         .map((w) => w[0])
@@ -55,8 +64,7 @@ export default function Layout() {
             <aside className={`sidebar glass-panel ${sidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar-header">
                     <div className="brand">
-                        <span className="brand-icon">8</span>
-                        <h1 className="text-glow-green">POCKET 6</h1>
+                        <h1 className="text-glow-green">{clubName.toUpperCase()}</h1>
                     </div>
                     <button className="close-btn" onClick={toggleSidebar}>
                         <X size={24} />
