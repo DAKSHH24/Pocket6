@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import cuebaseLogo from '../../assets/cuebase-logo.png';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -499,7 +500,7 @@ export default function AuthPage() {
         {/* Brand */}
         <div className="auth-brand">
           <img
-            src="/cuebase-logo.png"
+            src={cuebaseLogo}
             alt="Cue Base Logo"
             style={{ width: '90px', height: '90px', objectFit: 'contain', borderRadius: '16px', marginBottom: '0.75rem' }}
           />
